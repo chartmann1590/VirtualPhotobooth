@@ -191,35 +191,89 @@ info "Preloading common Piper models (if missing)..."
 PY_BIN=$(command -v python3 || command -v python)
 if [[ -n "$PY_BIN" ]]; then
 	"$PY_BIN" - <<'PY'
-import os, urllib.request
-base_urls = [
-  'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/',
-  'https://raw.githubusercontent.com/rhasspy/piper-voices/main/en/'
+import os, json, urllib.request
+
+VOICES_JSON_URLS = [
+  'https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json',
+  'https://raw.githubusercontent.com/rhasspy/piper-voices/main/voices.json',
 ]
-models = [
-  'en_US-amy-low.onnx',
-  'en_US-kusal-low.onnx',
-  'en_GB-jenny_dioco-low.onnx',
-  'en_US-lessac-low.onnx',
-]
-app_dir = os.path.dirname(os.path.abspath(__file__))
-target = os.path.join(app_dir, 'piper', 'models')
-os.makedirs(target, exist_ok=True)
-for m in models:
-    dest = os.path.join(target, m)
-    if os.path.exists(dest):
-        continue
+LANG_PREFIXES = ['en', 'de', 'es', 'it', 'zh', 'ja', 'ko', 'ru']
+
+def fetch_json():
     last = None
-    for base in base_urls:
-        url = base + m
+    for u in VOICES_JSON_URLS:
         try:
-            urllib.request.urlretrieve(url, dest)
-            print('Downloaded', m)
-            break
+            with urllib.request.urlopen(u, timeout=30) as r:
+                return json.loads(r.read().decode('utf-8'))
         except Exception as e:
             last = e
-    else:
-        print('Failed', m, last)
+    raise RuntimeError(f"Failed to fetch voices.json: {last}")
+
+def extract_models(data):
+    # data: { lang_variant: { voiceName: { quality: { files: { 'onnx': url }, 'gender': 'male' } } } }
+    picks = []
+    for prefix in LANG_PREFIXES:
+        # collect all voice entries for this language prefix
+        entries = []
+        for lang_key, voices in (data or {}).items():
+            if not isinstance(voices, dict):
+                continue
+            if not str(lang_key).lower().startswith(prefix.lower()):
+                continue
+            for voice_key, variants in voices.items():
+                if not isinstance(variants, dict):
+                    continue
+                # choose highest quality available first
+                for quality_key, meta in variants.items():
+                    files = (meta or {}).get('files') or {}
+                    onnx = files.get('onnx')
+                    if not onnx:
+                        continue
+                    gender = (meta or {}).get('gender') or (meta or {}).get('voice', {}).get('gender') or ''
+                    entries.append((onnx, str(gender).lower()))
+        # pick male and female if possible, else first two
+        male = next((u for u,g in entries if 'male' in g), None)
+        female = next((u for u,g in entries if 'female' in g), None)
+        chosen = []
+        if female:
+            chosen.append(female)
+        if male and male not in chosen:
+            chosen.append(male)
+        # fill up to 2
+        for u,_ in entries:
+            if len(chosen) >= 2:
+                break
+            if u not in chosen:
+                chosen.append(u)
+        picks.extend(chosen)
+    return picks
+
+def download(url, dest_dir):
+    os.makedirs(dest_dir, exist_ok=True)
+    fname = os.path.basename(url)
+    dest = os.path.join(dest_dir, fname)
+    if os.path.exists(dest):
+        return False
+    urllib.request.urlretrieve(url, dest)
+    return True
+
+def main():
+    data = fetch_json()
+    urls = extract_models(data)
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    target = os.path.join(app_dir, 'piper', 'models')
+    downloaded = 0
+    for u in urls:
+        try:
+            if download(u, target):
+                downloaded += 1
+                print('Downloaded', os.path.basename(u))
+        except Exception as e:
+            print('Failed', u, e)
+    print(f'Preload complete, {downloaded} file(s) downloaded to {target}')
+
+if __name__ == '__main__':
+    main()
 PY
 else
 	warn "Python not found; skipping Piper model preload"

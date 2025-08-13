@@ -51,7 +51,7 @@ def settings_page():
         data['tts']['engine'] = request.form.get('tts_engine', data['tts'].get('engine', 'browser'))
         data['tts']['voice'] = request.form.get('tts_voice', 'default')
         data['tts']['prompt'] = request.form.get('tts_prompt', 'Get ready! The photo will start soon.')
-        data['tts']['opentts_url'] = request.form.get('opentts_url', data['tts'].get('opentts_url', 'http://opentts:5500'))
+        data['tts']['piper_model'] = request.form.get('piper_model', data['tts'].get('piper_model', '/app/piper/models/en_US-amy-low.onnx'))
         store.write(data)
 
         if 'frame' in request.files:

@@ -97,7 +97,7 @@
               <span class="text-sm text-slate-400">Engine</span>
               <select id="ttsEngineSelect" name="tts_engine" class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="browser" {% if settings.tts.engine == 'browser' %}selected{% endif %}>Browser (Web Speech)</option>
-                <option value="opentts" {% if settings.tts.engine == 'opentts' %}selected{% endif %}>OpenTTS (Docker)</option>
+                <option value="piper" {% if settings.tts.engine == 'piper' %}selected{% endif %}>Piper (lightweight local)</option>
               </select>
             </label>
             <label class="block">
@@ -108,9 +108,9 @@
               <span class="text-sm text-slate-400">Prompt</span>
               <input id="ttsPromptInput" class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="tts_prompt" value="{{ settings.tts.prompt }}" />
             </label>
-          <label class="block md:col-span-2" id="openttsUrlRow">
-            <span class="text-sm text-slate-400">OpenTTS URL</span>
-            <input class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="opentts_url" value="{{ settings.tts.opentts_url }}" />
+          <label class="block md:col-span-2" id="piperModelRow">
+            <span class="text-sm text-slate-400">Piper model path</span>
+            <input class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="piper_model" value="{{ settings.tts.piper_model }}" />
           </label>
           </div>
           <div class="mt-3 grid md:grid-cols-3 gap-3">
@@ -173,7 +173,7 @@
       const previewBtn = document.getElementById('ttsPreviewBtn');
       const previewInput = document.getElementById('ttsPreviewInput');
       const promptInput = document.getElementById('ttsPromptInput');
-      const openttsUrlRow = document.getElementById('openttsUrlRow');
+      const piperModelRow = document.getElementById('piperModelRow');
 
       function listVoicesBrowser() {
         const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
@@ -200,7 +200,7 @@
         }
       }
 
-      async function listVoicesOpenTTS() {
+      async function listVoicesPiper() {
         if (!select) return;
         select.innerHTML = '';
         try {
@@ -208,31 +208,32 @@
           const data = await res.json();
           const voices = Array.isArray(data) ? data : (data.voices || []);
           voices.forEach(v => {
+            const id = typeof v === 'string' ? v : (v.name || v.id || v.voice || '');
             const opt = document.createElement('option');
-            opt.value = v.name || v.id || v.voice || '';
-            opt.textContent = `${v.name || v.id || v.voice} ${v.lang ? '(' + v.lang + ')' : ''}`;
-            if (current && opt.value === current) opt.selected = true;
+            opt.value = id;
+            opt.textContent = id;
+            if (current && id === current) opt.selected = true;
             select.appendChild(opt);
           });
           if (!select.options.length) {
             const opt = document.createElement('option');
-            opt.value = 'en_US/m-ailabs_low#male-en-0';
-            opt.textContent = 'm-ailabs male (en_US)';
+            opt.value = 'en_US-amy-low.onnx';
+            opt.textContent = 'en_US-amy-low.onnx';
             select.appendChild(opt);
           }
         } catch (e) {
           const opt = document.createElement('option');
-          opt.value = 'en_US/m-ailabs_low#male-en-0';
-          opt.textContent = 'm-ailabs male (en_US)';
+          opt.value = 'en_US-amy-low.onnx';
+          opt.textContent = 'en_US-amy-low.onnx';
           select.appendChild(opt);
         }
       }
 
       function refreshVoiceList() {
         const engine = engineSelect ? engineSelect.value : 'browser';
-        openttsUrlRow && openttsUrlRow.classList.toggle('hidden', engine !== 'opentts');
-        if (engine === 'opentts') {
-          listVoicesOpenTTS();
+        piperModelRow && piperModelRow.classList.toggle('hidden', engine !== 'piper');
+        if (engine === 'piper') {
+          listVoicesPiper();
         } else {
           if (window.speechSynthesis) {
             listVoicesBrowser();

@@ -19,10 +19,10 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     },
     "tts": {
         "enabled": True,
-        "engine": os.getenv('TTS_ENGINE', 'browser'),  # 'browser' or 'opentts'
+        "engine": os.getenv('TTS_ENGINE', 'browser'),  # 'browser' or 'piper'
         "voice": "default",
         "prompt": "Get ready! The photo will start soon.",
-        "opentts_url": os.getenv('OPENTTS_URL', 'http://opentts:5500')
+        "piper_model": os.getenv('PIPER_MODEL', '/app/piper/models/en_US-amy-low.onnx')
     }
 }
 

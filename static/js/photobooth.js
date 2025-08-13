@@ -60,7 +60,7 @@ function speak(text) {
 
 async function speakViaServer(text) {
   try {
-    const voice = settings.tts?.voice || 'default';
+    const voice = settings.tts?.voice || '';
     const q = new URLSearchParams({ text: text || 'Hello', voice });
     const res = await fetch(`/api/tts/speak?${q.toString()}`);
     if (!res.ok) return;

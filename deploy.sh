@@ -186,6 +186,45 @@ info "Starting stack..."
 $DC up -d
 success "Services started"
 
+# 5) Preload common Piper models (lightweight selection)
+info "Preloading common Piper models (if missing)..."
+PY_BIN=$(command -v python3 || command -v python)
+if [[ -n "$PY_BIN" ]]; then
+	"$PY_BIN" - <<'PY'
+import os, urllib.request
+base_urls = [
+  'https://huggingface.co/rhasspy/piper-voices/resolve/main/en/',
+  'https://raw.githubusercontent.com/rhasspy/piper-voices/main/en/'
+]
+models = [
+  'en_US-amy-low.onnx',
+  'en_US-kusal-low.onnx',
+  'en_GB-jenny_dioco-low.onnx',
+  'en_US-lessac-low.onnx',
+]
+app_dir = os.path.dirname(os.path.abspath(__file__))
+target = os.path.join(app_dir, 'piper', 'models')
+os.makedirs(target, exist_ok=True)
+for m in models:
+    dest = os.path.join(target, m)
+    if os.path.exists(dest):
+        continue
+    last = None
+    for base in base_urls:
+        url = base + m
+        try:
+            urllib.request.urlretrieve(url, dest)
+            print('Downloaded', m)
+            break
+        except Exception as e:
+            last = e
+    else:
+        print('Failed', m, last)
+PY
+else
+	warn "Python not found; skipping Piper model preload"
+fi
+
 # 5) Post-deploy info
 WEB_CONTAINER=$($DC ps -q web || true)
 NGINX_CONTAINER=$($DC ps -q nginx || true)

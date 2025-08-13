@@ -186,118 +186,69 @@ info "Starting stack..."
 $DC up -d
 success "Services started"
 
-# 5) Preload common Piper models (lightweight selection) using Hugging Face client inside Docker
+# 5) Preload common Piper models (list repo and download) using Hugging Face client inside Docker
 info "Preloading common Piper models (if missing)..."
 MODEL_DIR="$APP_DIR/piper/models"
 mkdir -p "$MODEL_DIR"
 docker run --rm -e HF_HUB_DISABLE_TELEMETRY=1 -v "$MODEL_DIR":/models python:3.11-slim bash -lc "pip install --no-cache-dir --upgrade pip >/dev/null 2>&1 && pip install --no-cache-dir huggingface_hub >/dev/null 2>&1 && python - <<'PY'
-import os, json
-from huggingface_hub import hf_hub_download
+import os, gzip, shutil
+from huggingface_hub import list_repo_files, hf_hub_download
+
 REPO = 'rhasspy/piper-voices'
-LANG_PREFIXES = ['en', 'de', 'es', 'it', 'zh', 'ja', 'ko', 'ru']
+LANG_DIRS = ['en', 'de', 'es', 'it', 'zh', 'ja', 'ko', 'ru']
 
-def load_voices_json():
-    path = hf_hub_download(REPO, filename='voices.json')
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-def collect_entries(node, lang_hint=None):
-    results = []
-    if isinstance(node, dict):
-        files = node.get('files') if isinstance(node.get('files'), dict) else None
-        if files and files.get('onnx') is not None:
-            onnx_entry = files.get('onnx')
-            onnx_val = None
-            if isinstance(onnx_entry, str):
-                onnx_val = onnx_entry
-            elif isinstance(onnx_entry, dict):
-                onnx_val = onnx_entry.get('path') or onnx_entry.get('file') or onnx_entry.get('filename') or onnx_entry.get('url')
-            if isinstance(onnx_val, str):
-                rel = onnx_val.split('/main/', 1)[-1]
-            else:
-                rel = None
-            gender = (node.get('gender') or (node.get('voice') or {}).get('gender') or '').lower()
-            lang_prefix = (lang_hint or '').lower()[:2]
-            if not lang_prefix and rel:
-                base = os.path.basename(rel)
-                guess = base.split('-', 1)[0].split('_', 1)[0]
-                lang_prefix = guess.lower()[:2]
-            if rel:
-                results.append((lang_prefix, rel, gender))
-        for v in node.values():
-            results.extend(collect_entries(v, lang_hint=lang_hint))
-    elif isinstance(node, list):
-        for v in node:
-            results.extend(collect_entries(v, lang_hint=lang_hint))
-    return results
-
-def pick_urls(data):
-    all_entries = []
-    for lang_key, voices in (data or {}).items():
-        if not isinstance(voices, (dict, list)):
-            continue
-        hint = str(lang_key).split('-', 1)[0].split('_', 1)[0]
-        all_entries.extend(collect_entries(voices, lang_hint=hint))
+def pick_files():
+    files = list_repo_files(REPO)
+    # consider both .onnx and .onnx.gz
+    onnx = [f for f in files if '/' in f and (f.endswith('.onnx') or f.endswith('.onnx.gz'))]
     picks = []
-    for prefix in LANG_PREFIXES:
-        entries = [(rel, gender) for lp, rel, gender in all_entries if lp == prefix]
-        if not entries:
-            continue
-        male = next((rel for rel,g in entries if 'male' in g), None)
-        female = next((rel for rel,g in entries if 'female' in g), None)
-        chosen = []
-        if female:
-            chosen.append(female)
-        if male and male not in chosen:
-            chosen.append(male)
-        for rel,_ in entries:
-            if len(chosen) >= 2:
-                break
-            if rel not in chosen:
-                chosen.append(rel)
-        picks.extend(chosen)
-    # de-dupe while preserving order
+    for lang in LANG_DIRS:
+        lang_files = [f for f in onnx if f.startswith(lang + '/')]
+        lang_files.sort(key=lambda x: (0 if ('-low.onnx' in x or '-low.onnx.gz' in x) else 1, x))
+        for f in lang_files[:2]:
+            picks.append(f)
+    # de-dupe preserve order
     seen = set(); out = []
-    for rel in picks:
-        if rel not in seen:
-            seen.add(rel); out.append(rel)
+    for f in picks:
+        if f not in seen:
+            seen.add(f); out.append(f)
     return out
 
+def ensure_download(rel, target):
+    path = hf_hub_download(REPO, filename=rel)
+    base = os.path.basename(path)
+    dest = os.path.join(target, base)
+    if not os.path.exists(dest):
+        with open(path, 'rb') as src, open(dest, 'wb') as dst:
+            dst.write(src.read())
+    if dest.endswith('.gz'):
+        out_path = dest[:-3]
+        if not os.path.exists(out_path):
+            with gzip.open(dest, 'rb') as f_in, open(out_path, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+    # config json
+    try:
+        cfg_path = hf_hub_download(REPO, filename=rel + '.json')
+        cfg_dest = os.path.join(target, os.path.basename(cfg_path))
+        if not os.path.exists(cfg_dest):
+            with open(cfg_path, 'rb') as src, open(cfg_dest, 'wb') as dst:
+                dst.write(src.read())
+    except Exception:
+        pass
+
 def main():
-    data = load_voices_json()
-    rel_files = pick_urls(data)
-    # Fallback curated models if extraction failed
-    if not rel_files:
-        rel_files = [
-            'en/en_US-amy-low.onnx', 'en/en_US-kusal-low.onnx', 'en/en_GB-jenny_dioco-low.onnx',
-            'de/de_DE-thorsten-low.onnx', 'es/es_ES-carlfm-low.onnx', 'it/it_IT-riccardo-fasol-low.onnx',
-            'zh/zh_CN-huayan-low.onnx', 'ja/ja_JP-hiroshi-low.onnx', 'ko/ko_KR-hyunjung-low.onnx',
-            'ru/ru_RU-ruslan-low.onnx'
-        ]
     target = '/models'
     os.makedirs(target, exist_ok=True)
+    files = pick_files()
     downloaded = 0
-    for rel in rel_files:
+    for rel in files:
         try:
-            model_path = hf_hub_download(REPO, filename=rel)
-            base = os.path.basename(model_path)
-            dest = os.path.join(target, base)
-            if not os.path.exists(dest):
-                with open(model_path, 'rb') as src, open(dest, 'wb') as dst:
-                    dst.write(src.read())
+            before = set(os.listdir(target))
+            ensure_download(rel, target)
+            after = set(os.listdir(target))
+            if after - before:
                 downloaded += 1
-                print('Downloaded', base)
-            # fetch config JSON if present
-            cfg_rel = rel + '.json'
-            try:
-                cfg_path = hf_hub_download(REPO, filename=cfg_rel)
-                cfg_base = os.path.basename(cfg_path)
-                cfg_dest = os.path.join(target, cfg_base)
-                if not os.path.exists(cfg_dest):
-                    with open(cfg_path, 'rb') as src, open(cfg_dest, 'wb') as dst:
-                        dst.write(src.read())
-            except Exception:
-                pass
+                print('Downloaded', rel)
         except Exception as e:
             print('Failed', rel, e)
     print(f'Preload complete, {downloaded} file(s) downloaded to {target}')

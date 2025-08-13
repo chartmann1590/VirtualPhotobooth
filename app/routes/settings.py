@@ -48,8 +48,10 @@ def settings_page():
         data['sms']['username'] = request.form.get('sms_username', '')
         data['sms']['password'] = request.form.get('sms_password', '')
         data['tts']['enabled'] = request.form.get('tts_enabled') == 'on'
+        data['tts']['engine'] = request.form.get('tts_engine', data['tts'].get('engine', 'browser'))
         data['tts']['voice'] = request.form.get('tts_voice', 'default')
         data['tts']['prompt'] = request.form.get('tts_prompt', 'Get ready! The photo will start soon.')
+        data['tts']['opentts_url'] = request.form.get('opentts_url', data['tts'].get('opentts_url', 'http://opentts:5500'))
         store.write(data)
 
         if 'frame' in request.files:

@@ -1,5 +1,13 @@
 version: '3.9'
 services:
+  opentts:
+    image: synesthesiam/opentts:latest
+    environment:
+      - TZ=UTC
+    ports:
+      - "5500:5500"
+    restart: unless-stopped
+
   web:
     build:
       context: .

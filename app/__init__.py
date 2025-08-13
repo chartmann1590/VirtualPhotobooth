@@ -21,10 +21,12 @@ def create_app() -> Flask:
     from .routes.photobooth import bp as photobooth_bp
     from .routes.settings import bp as settings_bp
     from .routes.gallery import bp as gallery_bp
+    from .routes.tts import bp as tts_bp
 
     app.register_blueprint(photobooth_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(gallery_bp)
+    app.register_blueprint(tts_bp)
 
     # Respect X-Forwarded-* when behind nginx
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)

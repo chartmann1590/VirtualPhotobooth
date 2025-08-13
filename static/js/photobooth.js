@@ -58,11 +58,32 @@ function speak(text) {
   speechSynthesis.speak(utter);
 }
 
+async function speakViaServer(text) {
+  try {
+    const voice = settings.tts?.voice || 'default';
+    const q = new URLSearchParams({ text: text || 'Hello', voice });
+    const res = await fetch(`/api/tts/speak?${q.toString()}`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    await audio.play();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    // fallback to browser TTS on failure
+    speak(text);
+  }
+}
+
 async function countdown(seconds) {
   for (let i = seconds; i >= 1; i--) {
     countdownEl.textContent = i;
     countdownEl.hidden = false;
-    speak(String(i));
+    if ((settings.tts?.engine || 'browser') === 'opentts') {
+      await speakViaServer(String(i));
+    } else {
+      speak(String(i));
+    }
     await new Promise(r => setTimeout(r, 1000));
   }
   countdownEl.hidden = true;
@@ -89,7 +110,11 @@ async function capture() {
 }
 
 startBtn.addEventListener('click', async () => {
-  speak(settings.tts?.prompt || 'Get ready!');
+  if ((settings.tts?.engine || 'browser') === 'opentts') {
+    await speakViaServer(settings.tts?.prompt || 'Get ready!');
+  } else {
+    speak(settings.tts?.prompt || 'Get ready!');
+  }
   await countdown(3);
   const imgData = await capture();
   const frame = frameSelect.value || '';

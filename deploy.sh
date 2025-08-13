@@ -205,16 +205,25 @@ def collect_entries(node, lang_hint=None):
     results = []
     if isinstance(node, dict):
         files = node.get('files') if isinstance(node.get('files'), dict) else None
-        if files and isinstance(files.get('onnx'), str):
-            onnx_url = files['onnx']
-            rel = onnx_url.split('/main/', 1)[-1]
+        if files and files.get('onnx') is not None:
+            onnx_entry = files.get('onnx')
+            onnx_val = None
+            if isinstance(onnx_entry, str):
+                onnx_val = onnx_entry
+            elif isinstance(onnx_entry, dict):
+                onnx_val = onnx_entry.get('path') or onnx_entry.get('file') or onnx_entry.get('filename') or onnx_entry.get('url')
+            if isinstance(onnx_val, str):
+                rel = onnx_val.split('/main/', 1)[-1]
+            else:
+                rel = None
             gender = (node.get('gender') or (node.get('voice') or {}).get('gender') or '').lower()
             lang_prefix = (lang_hint or '').lower()[:2]
-            if not lang_prefix:
+            if not lang_prefix and rel:
                 base = os.path.basename(rel)
                 guess = base.split('-', 1)[0].split('_', 1)[0]
                 lang_prefix = guess.lower()[:2]
-            results.append((lang_prefix, rel, gender))
+            if rel:
+                results.append((lang_prefix, rel, gender))
         for v in node.values():
             results.extend(collect_entries(v, lang_hint=lang_hint))
     elif isinstance(node, list):
@@ -257,6 +266,14 @@ def pick_urls(data):
 def main():
     data = load_voices_json()
     rel_files = pick_urls(data)
+    # Fallback curated models if extraction failed
+    if not rel_files:
+        rel_files = [
+            'en/en_US-amy-low.onnx', 'en/en_US-kusal-low.onnx', 'en/en_GB-jenny_dioco-low.onnx',
+            'de/de_DE-thorsten-low.onnx', 'es/es_ES-carlfm-low.onnx', 'it/it_IT-riccardo-fasol-low.onnx',
+            'zh/zh_CN-huayan-low.onnx', 'ja/ja_JP-hiroshi-low.onnx', 'ko/ko_KR-hyunjung-low.onnx',
+            'ru/ru_RU-ruslan-low.onnx'
+        ]
     target = '/models'
     os.makedirs(target, exist_ok=True)
     downloaded = 0

@@ -210,31 +210,34 @@ def fetch_json():
             last = e
     raise RuntimeError(f"Failed to fetch voices.json: {last}")
 
-def collect_entries(node):
+def collect_entries(node, lang_hint=None):
     results = []
     if isinstance(node, dict):
         files = node.get('files') if isinstance(node.get('files'), dict) else None
         if files and isinstance(files.get('onnx'), str):
             onnx = files['onnx']
             gender = (node.get('gender') or (node.get('voice') or {}).get('gender') or '').lower()
-            lang = (node.get('language') or node.get('lang') or '').lower()
-            # derive language prefix from lang or filename
-            if not lang and isinstance(onnx, str):
+            lang_prefix = (lang_hint or '')[:2]
+            if not lang_prefix and isinstance(onnx, str):
                 base = os.path.basename(onnx)
-                # e.g., en_US-amy-low.onnx -> en
                 guess = base.split('-', 1)[0].split('_', 1)[0]
-                lang = guess.lower()
-            lang_prefix = (lang or '')[:2]
+                lang_prefix = guess.lower()[:2]
             results.append((lang_prefix, onnx, gender))
         for v in node.values():
-            results.extend(collect_entries(v))
+            results.extend(collect_entries(v, lang_hint=lang_hint))
     elif isinstance(node, list):
         for v in node:
-            results.extend(collect_entries(v))
+            results.extend(collect_entries(v, lang_hint=lang_hint))
     return results
 
 def extract_models(data):
-    all_entries = collect_entries(data)
+    # Walk top-level by language keys when possible to preserve language mapping
+    all_entries = []
+    for lang_key, voices in (data or {}).items():
+        if not isinstance(voices, (dict, list)):
+            continue
+        lang_hint = str(lang_key).split('-', 1)[0].split('_', 1)[0].lower()
+        all_entries.extend(collect_entries(voices, lang_hint=lang_hint))
     picks = []
     for prefix in LANG_PREFIXES:
         entries = [(u,g) for lp,u,g in all_entries if lp == prefix]

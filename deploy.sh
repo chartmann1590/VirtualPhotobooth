@@ -214,8 +214,17 @@ def collect_entries(node):
     if isinstance(node, dict):
         files = node.get('files') if isinstance(node.get('files'), dict) else None
         if files and isinstance(files.get('onnx'), str):
-            gender = node.get('gender') or (node.get('voice') or {}).get('gender') or ''
-            results.append((files['onnx'], str(gender).lower()))
+            onnx = files['onnx']
+            gender = (node.get('gender') or (node.get('voice') or {}).get('gender') or '').lower()
+            lang = (node.get('language') or node.get('lang') or '').lower()
+            # derive language prefix from lang or filename
+            if not lang and isinstance(onnx, str):
+                base = os.path.basename(onnx)
+                # e.g., en_US-amy-low.onnx -> en
+                guess = base.split('-', 1)[0].split('_', 1)[0]
+                lang = guess.lower()
+            lang_prefix = (lang or '')[:2]
+            results.append((lang_prefix, onnx, gender))
         for v in node.values():
             results.extend(collect_entries(v))
     elif isinstance(node, list):
@@ -224,14 +233,12 @@ def collect_entries(node):
     return results
 
 def extract_models(data):
+    all_entries = collect_entries(data)
     picks = []
     for prefix in LANG_PREFIXES:
-        entries = []
-        for lang_key, voices in (data or {}).items():
-            if not str(lang_key).lower().startswith(prefix.lower()):
-                continue
-            entries.extend(collect_entries(voices))
-        # pick male and female if possible, else first two
+        entries = [(u,g) for lp,u,g in all_entries if lp == prefix]
+        if not entries:
+            continue
         male = next((u for u,g in entries if 'male' in g), None)
         female = next((u for u,g in entries if 'female' in g), None)
         chosen = []

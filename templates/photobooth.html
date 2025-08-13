@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photobooth</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <script>
+    window.APP_SETTINGS = {{ settings | tojson | safe if settings else 'null' }};
+  </script>
+  <style>
+    .header { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(11,16,32,0.6); backdrop-filter: blur(8px); z-index: 20; }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-weight: 700; letter-spacing: 0.3px; }
+    .nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
+    .nav a:hover { color: var(--text); }
+  </style>
+  <script>
+    if (!('mediaDevices' in navigator)) {
+      alert('Camera not supported in this browser.');
+    }
+  </script>
+  <script>
+    // Load speech voices early for better availability
+    window.speechSynthesis && speechSynthesis.getVoices();
+  </script>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <div class="brand">📸 Virtual Photobooth</div>
+      <nav class="nav">
+        <a href="{{ url_for('photobooth.index') }}">Photobooth</a>
+        <a href="{{ url_for('gallery.gallery') }}">Gallery</a>
+        <a href="{{ url_for('settings.settings_page') }}">Settings</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <section class="card">
+      <h1>Photobooth</h1>
+      <div class="grid">
+        <div>
+          <div class="camera-wrapper">
+            <video id="camera" autoplay playsinline></video>
+            <canvas id="overlay" class="overlay"></canvas>
+            <div id="countdown" class="countdown" hidden>3</div>
+          </div>
+          <div class="controls">
+            <select id="frameSelect">
+              <option value="">No Frame</option>
+              {% for f in frames %}
+              <option value="{{ f }}">{{ f }}</option>
+              {% endfor %}
+            </select>
+            <button id="startBtn" class="btn primary">Start</button>
+          </div>
+          <div id="sharePanel" class="share-panel" hidden>
+            <h3>Share your photo</h3>
+            <div class="share-row">
+              <input type="email" id="emailInput" placeholder="Email address" />
+              <button id="emailBtn" class="btn">Send Email</button>
+            </div>
+            <div class="share-row">
+              <input type="tel" id="phoneInput" placeholder="Phone number (+1...)" />
+              <button id="smsBtn" class="btn">Send SMS</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3>Preview</h3>
+          <canvas id="previewCanvas" class="preview"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="container">Made with ❤️</div>
+  </footer>
+  <script src="{{ url_for('static', filename='js/photobooth.js') }}"></script>
+</body>
+</html>

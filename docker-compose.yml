@@ -1,0 +1,29 @@
+version: '3.9'
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    env_file:
+      - .env
+    volumes:
+      - ./photos:/app/photos
+      - ./config:/app/config
+      - ./static/frames:/app/static/frames
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nginx
+    depends_on:
+      - web
+    volumes:
+      - ./static:/app/static:ro
+      - ./docker/certs:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped

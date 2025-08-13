@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <style>
+    .header { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(11,16,32,0.6); backdrop-filter: blur(8px); z-index: 20; }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-weight: 700; letter-spacing: 0.3px; }
+    .nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
+    .nav a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <div class="brand">📸 Virtual Photobooth</div>
+      <nav class="nav">
+        <a href="{{ url_for('photobooth.index') }}">Photobooth</a>
+        <a href="{{ url_for('gallery.gallery') }}">Gallery</a>
+        <a href="{{ url_for('settings.settings_page') }}">Settings</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <section class="card">
+      <h1>Gallery</h1>
+      <div class="gallery-grid">
+        {% for p in photos %}
+        <div class="gallery-item">
+          <img src="{{ url_for('photobooth.get_photo', filename=p) }}" alt="photo" />
+          <div class="share-row">
+            <input type="email" placeholder="Email" data-email />
+            <button class="btn" data-email-btn data-filename="{{ p }}">Send Email</button>
+          </div>
+          <div class="share-row">
+            <input type="tel" placeholder="Phone" data-phone />
+            <button class="btn" data-sms-btn data-filename="{{ p }}">Send SMS</button>
+          </div>
+        </div>
+        {% else %}
+        <p>No photos yet. Take one on the Photobooth page.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+  <footer class="footer">
+    <div class="container">Made with ❤️</div>
+  </footer>
+  <script>
+    document.querySelectorAll('[data-email-btn]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const filename = btn.dataset.filename;
+        const email = btn.closest('.gallery-item').querySelector('[data-email]').value;
+        const res = await fetch('/api/share/email', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename, email })
+        });
+        alert(res.ok ? 'Email sent' : 'Failed to send email');
+      });
+    });
+    document.querySelectorAll('[data-sms-btn]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const filename = btn.dataset.filename;
+        const phone = btn.closest('.gallery-item').querySelector('[data-phone]').value;
+        const res = await fetch('/api/share/sms', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename, phone })
+        });
+        alert(res.ok ? 'SMS sent' : 'Failed to send SMS');
+      });
+    });
+  </script>
+</body>
+</html>

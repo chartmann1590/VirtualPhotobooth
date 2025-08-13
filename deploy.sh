@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+CERT_DIR="$APP_DIR/docker/certs"
+ENV_FILE="$APP_DIR/.env"
+
+bold() { printf '\033[1m%s\033[0m\n' "$*"; }
+info() { printf '\033[34m[i]\033[0m %s\n' "$*"; }
+success() { printf '\033[32m[✓]\033[0m %s\n' "$*"; }
+warn() { printf '\033[33m[!]\033[0m %s\n' "$*"; }
+err() { printf '\033[31m[✗]\033[0m %s\n' "$*"; }
+
+bold "Virtual Photobooth – Docker Deploy"
+
+# 0) Update repository first (pull latest), but stop if deploy.sh itself changed
+if command -v git >/dev/null 2>&1 && git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	info "Checking for repository updates..."
+	BRANCH=$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+	if git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1; then
+		git -C "$APP_DIR" fetch --tags --prune origin "$BRANCH" >/dev/null 2>&1 || true
+		# Detect if there are incoming changes
+		if ! git -C "$APP_DIR" diff --quiet HEAD..origin/"$BRANCH" --; then
+			CHANGED_FILES=$(git -C "$APP_DIR" diff --name-only HEAD..origin/"$BRANCH" || true)
+			if echo "$CHANGED_FILES" | grep -q "^deploy.sh$"; then
+				warn "deploy.sh has updates in origin/$BRANCH."
+				err "For safety, please run a manual 'git pull' to update the deploy script, then re-run ./deploy.sh."
+				exit 1
+			fi
+			info "Pulling latest changes from origin/$BRANCH..."
+			git -C "$APP_DIR" pull --rebase --autostash origin "$BRANCH"
+			success "Repository updated"
+		else
+			info "Repository is up to date"
+		fi
+	else
+		warn "No 'origin' remote found. Skipping git update."
+	fi
+else
+	warn "Not a git repository or git not installed. Skipping repo update."
+fi
+
+# 1) Ensure required tools and pick docker compose command
+if ! command -v docker >/dev/null 2>&1; then
+	err "docker is required but not found. Please install Docker."
+	exit 1
+fi
+if ! command -v openssl >/dev/null 2>&1; then
+	err "openssl is required but not found."
+	exit 1
+fi
+
+DC=""
+if docker compose version >/dev/null 2>&1; then
+	DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+	DC="docker-compose"
+else
+	err "Neither 'docker compose' nor 'docker-compose' found. Please install Docker Compose."
+	exit 1
+fi
+success "Using compose command: $DC"
+
+# Helpers for editing .env safely (macOS/BSD compatible)
+set_env_var() {
+	# Usage: set_env_var KEY VALUE FILE
+	local key="$1"; shift
+	local value="$1"; shift
+	local file="$1"
+	if grep -qE "^${key}=" "$file"; then
+		# Replace existing line
+		tmpfile="${file}.tmp.$$"
+		sed "s|^${key}=.*$|${key}=${value}|" "$file" > "$tmpfile" && mv "$tmpfile" "$file"
+	else
+		echo "${key}=${value}" >> "$file"
+	fi
+}
+
+# 2) Ensure .env exists or offer to replace
+if [[ -f "$ENV_FILE" ]]; then
+	info ".env already exists."
+	read -r -p "Do you want to use the existing .env? [Y/n]: " USE_EXISTING
+	USE_EXISTING=${USE_EXISTING:-Y}
+	if [[ "$USE_EXISTING" =~ ^[Nn]$ ]]; then
+		TS=$(date +%Y%m%d_%H%M%S)
+		mv "$ENV_FILE" "$ENV_FILE.bak.$TS"
+		warn "Backed up existing .env to .env.bak.$TS"
+		if [[ -f "$APP_DIR/.env.example" ]]; then
+			cp "$APP_DIR/.env.example" "$ENV_FILE"
+			info "Created new .env from .env.example"
+		else
+			touch "$ENV_FILE"
+			info "Created new empty .env"
+		fi
+	else
+		info "Keeping existing .env"
+	fi
+else
+	if [[ -f "$APP_DIR/.env.example" ]]; then
+		cp "$APP_DIR/.env.example" "$ENV_FILE"
+		warn ".env was missing. Created from .env.example."
+	else
+		touch "$ENV_FILE"
+		warn ".env was missing. Created an empty .env."
+	fi
+fi
+
+# 2b) Offer to set ADMIN_PASSWORD
+read -r -p "Do you want to set ADMIN_PASSWORD now? [Y/n]: " SET_ADMIN
+SET_ADMIN=${SET_ADMIN:-Y}
+if [[ "$SET_ADMIN" =~ ^[Nn]$ ]]; then
+	info "Using default ADMIN_PASSWORD=admin123"
+	set_env_var ADMIN_PASSWORD admin123 "$ENV_FILE"
+else
+	while true; do
+		read -r -s -p "Enter ADMIN_PASSWORD: " APW; echo
+		read -r -s -p "Confirm ADMIN_PASSWORD: " APW2; echo
+		if [[ "$APW" == "$APW2" && -n "$APW" ]]; then
+			set_env_var ADMIN_PASSWORD "$APW" "$ENV_FILE"
+			success "ADMIN_PASSWORD set in .env"
+			break
+		else
+			warn "Passwords did not match or were empty. Please try again."
+		fi
+	done
+fi
+
+# 3) Generate self-signed certificate if absent
+mkdir -p "$CERT_DIR"
+CRT="$CERT_DIR/server.crt"
+KEY="$CERT_DIR/server.key"
+if [[ ! -f "$CRT" || ! -f "$KEY" ]]; then
+	DOMAIN=${DOMAIN:-localhost}
+	info "Generating self-signed TLS cert for $DOMAIN (valid 825 days)"
+	openssl req -x509 -nodes -days 825 -newkey rsa:2048 \
+		-keyout "$KEY" -out "$CRT" \
+		-subj "/C=US/ST=NA/L=Local/O=VirtualPhotobooth/OU=Dev/CN=$DOMAIN" \
+		-addext "subjectAltName=DNS:$DOMAIN,IP:127.0.0.1" >/dev/null 2>&1
+	success "Self-signed cert generated: docker/certs/server.crt, server.key"
+else
+	info "Using existing TLS certificate in docker/certs/"
+fi
+
+# 4) Build and start containers
+info "Building containers..."
+$DC build --no-cache
+success "Build complete"
+
+info "Starting stack..."
+$DC up -d
+success "Services started"
+
+# 5) Post-deploy info
+WEB_CONTAINER=$($DC ps -q web || true)
+NGINX_CONTAINER=$($DC ps -q nginx || true)
+
+bold "Deployment summary"
+cat <<SUMMARY
+- Web container: ${WEB_CONTAINER:-(not found)}
+- Nginx container: ${NGINX_CONTAINER:-(not found)}
+- HTTPS URL: https://localhost/
+- HTTP redirects to HTTPS
+- Static frames dir (mounted): ./static/frames
+- Photos dir (mounted): ./photos
+- Settings stored in: ./config/settings.json
+- Admin Settings page: https://localhost/settings
+  • Password set via ADMIN_PASSWORD in .env
+- SMS via SMSGate: configure in Settings (docs: https://sms-gate.app/)
+- Email via SMTP: configure in Settings
+
+Troubleshooting:
+- View live logs: $DC logs -f
+- Restart: $DC restart
+- Stop: $DC down
+- Rebuild after changes: $DC build --no-cache && $DC up -d
+- If browser warns about self-signed cert, proceed to advanced/continue for local dev.
+SUMMARY
+
+success "Deployment complete. Open https://localhost in your browser."

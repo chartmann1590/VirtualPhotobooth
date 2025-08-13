@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <style>
+    .header { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(11,16,32,0.6); backdrop-filter: blur(8px); z-index: 20; }
+    .header-inner { display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-weight: 700; letter-spacing: 0.3px; }
+    .nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
+    .nav a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <div class="brand">📸 Virtual Photobooth</div>
+      <nav class="nav">
+        <a href="{{ url_for('photobooth.index') }}">Photobooth</a>
+        <a href="{{ url_for('gallery.gallery') }}">Gallery</a>
+        <a href="{{ url_for('settings.settings_page') }}">Settings</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    {% if not is_admin %}
+    <section class="card sm">
+      <h1>Admin Login</h1>
+      <form method="post" class="form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        {% if login_error %}<div class="error">{{ login_error }}</div>{% endif %}
+        <label>Password
+          <input type="password" name="password" required />
+        </label>
+        <button class="btn primary" type="submit">Login</button>
+      </form>
+    </section>
+    {% else %}
+    <section class="card">
+      <h1>Settings</h1>
+      <form method="post" enctype="multipart/form-data" class="form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+
+        <h2>Frames</h2>
+        <div class="form-row">
+          <input type="file" name="frame" accept="image/png" />
+          <button class="btn">Upload Frame</button>
+        </div>
+        <div class="frames-list">
+          {% for f in frames %}
+          <div class="chip">
+            {{ f }}
+            <button class="chip-delete" data-filename="{{ f }}" type="button">✕</button>
+          </div>
+          {% else %}
+          <p>No frames uploaded yet.</p>
+          {% endfor %}
+        </div>
+
+        <h2>SMTP</h2>
+        <div class="grid-2">
+          <label>Host <input type="text" name="smtp_host" value="{{ settings.smtp.host }}" /></label>
+          <label>Port <input type="number" name="smtp_port" value="{{ settings.smtp.port }}" /></label>
+          <label>User <input type="text" name="smtp_user" value="{{ settings.smtp.user }}" /></label>
+          <label>Password <input type="password" name="smtp_password" value="{{ settings.smtp.password }}" /></label>
+          <label>From <input type="email" name="smtp_from" value="{{ settings.smtp.from_email }}" /></label>
+        </div>
+
+        <h2>SMS Gateway</h2>
+        <div class="grid-2">
+          <label>API Base <input type="text" name="sms_api_base" value="{{ settings.sms.api_base }}" /></label>
+          <label>Username <input type="text" name="sms_username" value="{{ settings.sms.username }}" /></label>
+          <label>Password <input type="password" name="sms_password" value="{{ settings.sms.password }}" /></label>
+        </div>
+        <p class="muted">We use the SMSGate API to send SMS. See docs at <a href="https://sms-gate.app/" target="_blank" rel="noreferrer">sms-gate.app</a>.</p>
+
+        <h2>TTS</h2>
+        <label class="switch">
+          <input type="checkbox" name="tts_enabled" {% if settings.tts.enabled %}checked{% endif %} />
+          <span>Enable TTS</span>
+        </label>
+        <div class="grid-2">
+          <label>Voice <input type="text" name="tts_voice" value="{{ settings.tts.voice }}" /></label>
+          <label>Prompt <input type="text" name="tts_prompt" value="{{ settings.tts.prompt }}" /></label>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" type="submit">Save Settings</button>
+          <a class="btn" href="{{ url_for('settings.logout') }}">Logout</a>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+  </main>
+  <footer class="footer">
+    <div class="container">Made with ❤️</div>
+  </footer>
+  <script>
+    document.querySelectorAll('.chip-delete').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const filename = btn.dataset.filename;
+        const form = new FormData();
+        form.append('filename', filename);
+        form.append('csrf_token', '{{ csrf_token }}');
+        await fetch('/api/delete_frame', { method: 'POST', body: form });
+        location.reload();
+      });
+    });
+  </script>
+</body>
+</html>

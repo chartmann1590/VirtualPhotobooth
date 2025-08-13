@@ -151,7 +151,10 @@
     <div class="max-w-7xl mx-auto px-6 py-6 text-slate-400">Made with ❤️</div>
   </footer>
 
-  <script>
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact@10.22.0';
+    import htm from 'https://esm.sh/htm@3.1.1';
+    const html = htm.bind(h);
     document.querySelectorAll('[data-filename]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const filename = btn.dataset.filename;

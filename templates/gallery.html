@@ -60,29 +60,35 @@
     <div class="max-w-7xl mx-auto px-6 py-6 text-slate-400">Made with ❤️</div>
   </footer>
 
-  <script>
-    document.querySelectorAll('[data-email-btn]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const filename = btn.dataset.filename;
-        const email = btn.closest('article').querySelector('[data-email]').value;
-        const res = await fetch('/api/share/email', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename, email })
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact@10.22.0';
+    import { useEffect } from 'https://esm.sh/preact@10.22.0/hooks';
+    import htm from 'https://esm.sh/htm@3.1.1';
+    const html = htm.bind(h);
+
+    const App = () => {
+      useEffect(() => {
+        document.querySelectorAll('[data-email-btn]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const filename = btn.dataset.filename;
+            const email = btn.closest('article').querySelector('[data-email]').value;
+            const res = await fetch('/api/share/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename, email }) });
+            alert(res.ok ? 'Email sent' : 'Failed to send email');
+          });
         });
-        alert(res.ok ? 'Email sent' : 'Failed to send email');
-      });
-    });
-    document.querySelectorAll('[data-sms-btn]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const filename = btn.dataset.filename;
-        const phone = btn.closest('article').querySelector('[data-phone]').value;
-        const res = await fetch('/api/share/sms', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename, phone })
+        document.querySelectorAll('[data-sms-btn]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const filename = btn.dataset.filename;
+            const phone = btn.closest('article').querySelector('[data-phone]').value;
+            const res = await fetch('/api/share/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename, phone }) });
+            alert(res.ok ? 'SMS sent' : 'Failed to send SMS');
+          });
         });
-        alert(res.ok ? 'SMS sent' : 'Failed to send SMS');
-      });
-    });
+      }, []);
+      return html``;
+    };
+
+    render(h(App), document.body);
   </script>
 </body>
 </html>

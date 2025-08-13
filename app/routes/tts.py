@@ -45,6 +45,9 @@ def tts_speak():
             '--output_file', wav_path,
             '--text', text
         ]
+        config_path = model_path + '.json'
+        if os.path.exists(config_path):
+            cmd[1:1] = ['--config', config_path]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # Try to transcode to mp3 if ffmpeg exists
         mp3_path = wav_path.replace('.wav', '.mp3')

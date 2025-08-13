@@ -20,6 +20,7 @@ services:
       - ./photos:/app/photos
       - ./config:/app/config
       - ./static/frames:/app/static/frames
+      - ./piper/models:/app/piper/models:ro
     expose:
       - "8000"
     restart: unless-stopped

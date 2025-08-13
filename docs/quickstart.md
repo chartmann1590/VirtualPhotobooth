@@ -31,6 +31,6 @@ Use the provided deploy script which builds images, generates a self-signed TLS 
 chmod +x deploy.sh
 ./deploy.sh
 ```
-Then visit: https://localhost/
+Then visit: `https://<your-ip-address>/` (the script will display it)
 
 See [Deployment (Docker)](./deployment_docker.md) for details.

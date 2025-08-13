@@ -14,7 +14,7 @@ This project includes a production-like Docker stack with Nginx (TLS termination
 chmod +x deploy.sh
 ./deploy.sh
 ```
-Then open `https://localhost/` and accept the self-signed certificate.
+Then open `https://<your-ip-address>/` and accept the self-signed certificate. The deploy script prints the detected IP.
 
 ## Volumes
 - `./photos` → `/app/photos`

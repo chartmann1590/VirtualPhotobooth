@@ -13,6 +13,36 @@ err() { printf '\033[31m[✗]\033[0m %s\n' "$*"; }
 
 bold "Virtual Photobooth – Docker Deploy"
 
+# Helper: detect primary local IP address
+detect_ip() {
+	# Try Linux first
+	if command -v hostname >/dev/null 2>&1; then
+		IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+		if [[ -n "${IP:-}" ]]; then echo "$IP"; return 0; fi
+	fi
+	if command -v ip >/dev/null 2>&1; then
+		IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -n1)
+		if [[ -n "${IP:-}" ]]; then echo "$IP"; return 0; fi
+	fi
+	# macOS: detect default interface and query it
+	if command -v route >/dev/null 2>&1 && command -v awk >/dev/null 2>&1; then
+		IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')
+		if [[ -n "${IFACE:-}" ]] && command -v ipconfig >/dev/null 2>&1; then
+			IP=$(ipconfig getifaddr "$IFACE" 2>/dev/null || true)
+			if [[ -n "${IP:-}" ]]; then echo "$IP"; return 0; fi
+		fi
+	fi
+	# Fallbacks for common interfaces
+	for i in en0 en1 eth0; do
+		if command -v ipconfig >/dev/null 2>&1; then
+			IP=$(ipconfig getifaddr "$i" 2>/dev/null || true)
+			[[ -n "${IP:-}" ]] && { echo "$IP"; return 0; }
+		fi
+		done
+	# Last resort
+	echo "127.0.0.1"
+}
+
 # 0) Update repository first (pull latest), but stop if deploy.sh itself changed
 if command -v git >/dev/null 2>&1 && git -C "$APP_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 	info "Checking for repository updates..."
@@ -154,16 +184,17 @@ success "Services started"
 WEB_CONTAINER=$($DC ps -q web || true)
 NGINX_CONTAINER=$($DC ps -q nginx || true)
 
+HOST_IP=${HOST_IP:-$(detect_ip)}
 bold "Deployment summary"
 cat <<SUMMARY
 - Web container: ${WEB_CONTAINER:-(not found)}
 - Nginx container: ${NGINX_CONTAINER:-(not found)}
-- HTTPS URL: https://localhost/
+- HTTPS URL: https://$HOST_IP/
 - HTTP redirects to HTTPS
 - Static frames dir (mounted): ./static/frames
 - Photos dir (mounted): ./photos
 - Settings stored in: ./config/settings.json
-- Admin Settings page: https://localhost/settings
+- Admin Settings page: https://$HOST_IP/settings
   • Password set via ADMIN_PASSWORD in .env
 - SMS via SMSGate: configure in Settings (docs: https://sms-gate.app/)
 - Email via SMTP: configure in Settings

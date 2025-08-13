@@ -14,8 +14,8 @@ Common operational tasks:
 - `docker compose logs -f`
 
 ## Health checks
-- Open `/` to confirm photobooth page loads
-- Open `/settings` and `/gallery`
+- Open `https://<your-ip-address>/` to confirm photobooth page loads
+- Open `https://<your-ip-address>/settings` and `/gallery`
 
 ## Common issues
 - Permissions on mounted volumes (ensure container user can read/write)

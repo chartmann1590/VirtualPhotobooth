@@ -190,8 +190,8 @@ success "Services started"
 info "Preloading common Piper models (if missing)..."
 PY_BIN=$(command -v python3 || command -v python)
 if [[ -n "$PY_BIN" ]]; then
-	"$PY_BIN" - <<'PY'
-import os, json, urllib.request
+"$PY_BIN" - <<'PY'
+import os, json, urllib.request, urllib.error
 
 VOICES_JSON_URLS = [
   'https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json',
@@ -203,7 +203,8 @@ def fetch_json():
     last = None
     for u in VOICES_JSON_URLS:
         try:
-            with urllib.request.urlopen(u, timeout=30) as r:
+            req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=45) as r:
                 return json.loads(r.read().decode('utf-8'))
         except Exception as e:
             last = e
@@ -260,12 +261,22 @@ def download(url, dest_dir):
     dest = os.path.join(dest_dir, fname)
     if os.path.exists(dest):
         return False
-    urllib.request.urlretrieve(url, dest)
+    # try with UA and optional ?download=true
+    for candidate in (url, url + ('?download=true' if '?' not in url else '&download=true')):
+        try:
+            req = urllib.request.Request(candidate, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=120) as resp, open(dest, 'wb') as out:
+                out.write(resp.read())
+            return True
+        except Exception:
+            last = candidate
+            continue
+    raise urllib.error.URLError(f"Failed to download {url}")
     return True
 
 def main():
     data = fetch_json()
-    urls = extract_models(data)
+    urls = list(dict.fromkeys(extract_models(data)))  # de-dupe, keep order
     app_dir = os.path.dirname(os.path.abspath(__file__))
     target = os.path.join(app_dir, 'piper', 'models')
     downloaded = 0

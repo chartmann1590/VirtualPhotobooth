@@ -191,7 +191,13 @@ info "Preloading common Piper models (if missing)..."
 PY_BIN=$(command -v python3 || command -v python)
 if [[ -n "$PY_BIN" ]]; then
 "$PY_BIN" - <<'PY'
-import os, json, urllib.request, urllib.error
+import os, json, urllib.request, urllib.error, sys, subprocess
+try:
+    from huggingface_hub import hf_hub_download
+except Exception:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'huggingface_hub'])
+    from huggingface_hub import hf_hub_download
+REPO = 'rhasspy/piper-voices'
 
 VOICES_JSON_URLS = [
   'https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json',
@@ -200,15 +206,10 @@ VOICES_JSON_URLS = [
 LANG_PREFIXES = ['en', 'de', 'es', 'it', 'zh', 'ja', 'ko', 'ru']
 
 def fetch_json():
-    last = None
-    for u in VOICES_JSON_URLS:
-        try:
-            req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=45) as r:
-                return json.loads(r.read().decode('utf-8'))
-        except Exception as e:
-            last = e
-    raise RuntimeError(f"Failed to fetch voices.json: {last}")
+    # Use huggingface_hub to fetch voices.json reliably
+    path = hf_hub_download(REPO, filename='voices.json')
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 def collect_entries(node, lang_hint=None):
     results = []
@@ -260,21 +261,25 @@ def extract_models(data):
 
 def download(url, dest_dir):
     os.makedirs(dest_dir, exist_ok=True)
-    fname = os.path.basename(url)
+    # Map full URL to repo-relative path and download via huggingface_hub
+    rel = url.split('/main/', 1)[-1]
+    local_path = hf_hub_download(REPO, filename=rel)
+    fname = os.path.basename(local_path)
     dest = os.path.join(dest_dir, fname)
     if os.path.exists(dest):
         return False
-    # try with UA and optional ?download=true
-    for candidate in (url, url + ('?download=true' if '?' not in url else '&download=true')):
-        try:
-            req = urllib.request.Request(candidate, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=120) as resp, open(dest, 'wb') as out:
-                out.write(resp.read())
-            return True
-        except Exception:
-            last = candidate
-            continue
-    raise urllib.error.URLError(f"Failed to download {url}")
+    with open(local_path, 'rb') as src, open(dest, 'wb') as dst:
+        dst.write(src.read())
+    # Try to get accompanying config JSON
+    try:
+        cfg_local = hf_hub_download(REPO, filename=rel + '.json')
+        cfg_name = os.path.basename(cfg_local)
+        cfg_dest = os.path.join(dest_dir, cfg_name)
+        if not os.path.exists(cfg_dest):
+            with open(cfg_local, 'rb') as src, open(cfg_dest, 'wb') as dst:
+                dst.write(src.read())
+    except Exception:
+        pass
     return True
 
 def main():

@@ -63,6 +63,23 @@ flask --app app run --host 0.0.0.0 --port ${PORT:-5000}
 - Gallery: http://localhost:5000/gallery
 - Settings (admin): http://localhost:5000/settings
 
+## Quick Deploy (Docker)
+
+1) Make the script executable and run it:
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+The script will:
+- Pull the latest repo (and stop if deploy.sh changed)
+- Ensure `.env` (option to keep existing)
+- Generate a self-signed TLS cert
+- Build and start containers (web + nginx + optional piper)
+- Auto-download a small set of Piper models for common locales (male/female when available)
+- Print your system IP to open: `https://<your-ip>/`
+
+2) TTS configuration: see [Text-to-Speech](./docs/tts.md)
+
 ## Frames
 Upload transparent PNG frames via Settings. The camera view is masked to the transparent area of the frame. Place PNGs into `static/frames/`.
 
@@ -71,7 +88,7 @@ Upload transparent PNG frames via Settings. The camera view is masked to the tra
 - Storage: Local `photos/` directory; app settings persisted to `config/settings.json`
 - Email: SMTP via `smtplib`
 - SMS: SMSGate REST API (`/3rdparty/v1/message`) with Basic Auth
-- TTS: Browser Web Speech API (free, offline capable in many browsers)
+- TTS: Browser Web Speech API, or Piper (lightweight neural TTS in Docker)
 
 ## Security
 - Admin Settings protected by password (`ADMIN_PASSWORD`)

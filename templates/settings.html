@@ -93,9 +93,25 @@
               <input type="checkbox" name="tts_enabled" {% if settings.tts.enabled %}checked{% endif %} class="h-4 w-4" />
               <span>Enable TTS</span>
             </label>
-            <label class="block"> <span class="text-sm text-slate-400">Voice</span> <input class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="tts_voice" value="{{ settings.tts.voice }}" /> </label>
-            <label class="block md:col-span-2"> <span class="text-sm text-slate-400">Prompt</span> <input class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="tts_prompt" value="{{ settings.tts.prompt }}" /> </label>
+            <label class="block">
+              <span class="text-sm text-slate-400">Voice</span>
+              <select id="ttsVoiceSelect" name="tts_voice" data-current-voice="{{ settings.tts.voice }}" class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-slate-400">Prompt</span>
+              <input id="ttsPromptInput" class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="tts_prompt" value="{{ settings.tts.prompt }}" />
+            </label>
           </div>
+          <div class="mt-3 grid md:grid-cols-3 gap-3">
+            <label class="md:col-span-2 block">
+              <span class="text-sm text-slate-400">Preview text</span>
+              <input id="ttsPreviewInput" class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" placeholder="Hello! This is a voice preview." />
+            </label>
+            <div class="flex items-end">
+              <button type="button" id="ttsPreviewBtn" class="w-full px-4 py-2 rounded-xl font-semibold bg-slate-800 hover:bg-slate-700 transition">Preview Voice</button>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 mt-2">Voices are provided by your browser/OS (Web Speech API). Availability varies by device and language.</p>
         </div>
 
         <div class="flex gap-3">
@@ -122,6 +138,62 @@
         location.reload();
       });
     });
+    // TTS voices population and preview
+    (function() {
+      const select = document.getElementById('ttsVoiceSelect');
+      const current = select ? select.getAttribute('data-current-voice') : '';
+      const previewBtn = document.getElementById('ttsPreviewBtn');
+      const previewInput = document.getElementById('ttsPreviewInput');
+      const promptInput = document.getElementById('ttsPromptInput');
+
+      function listVoices() {
+        const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+        if (!select) return;
+        const seen = new Set();
+        select.innerHTML = '';
+        voices
+          .sort((a, b) => (a.lang || '').localeCompare(b.lang || '') || (a.name || '').localeCompare(b.name || ''))
+          .forEach(v => {
+            const key = `${v.name}|${v.lang}`;
+            if (seen.has(key)) return; seen.add(key);
+            const opt = document.createElement('option');
+            opt.value = v.name;
+            opt.textContent = `${v.name} (${v.lang})${v.localService ? '' : ' • remote'}`;
+            if (current && v.name === current) opt.selected = true;
+            select.appendChild(opt);
+          });
+        // Fallback option
+        if (!select.options.length) {
+          const opt = document.createElement('option');
+          opt.value = 'default';
+          opt.textContent = 'Default voice';
+          select.appendChild(opt);
+        }
+      }
+
+      if (window.speechSynthesis) {
+        listVoices();
+        // Some browsers load voices asynchronously
+        window.speechSynthesis.onvoiceschanged = () => listVoices();
+      }
+
+      function speak(text) {
+        if (!window.speechSynthesis) return;
+        const utter = new SpeechSynthesisUtterance(text || 'Hello! This is a voice preview.');
+        const desired = select && select.value;
+        const v = speechSynthesis.getVoices().find(x => x.name === desired);
+        if (v) utter.voice = v;
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utter);
+      }
+
+      if (previewBtn) {
+        previewBtn.addEventListener('click', () => {
+          const text = (previewInput && previewInput.value) || (promptInput && promptInput.value) || 'Hello! This is a voice preview.';
+          speak(text);
+        });
+      }
+    })();
   </script>
 </body>
 </html>

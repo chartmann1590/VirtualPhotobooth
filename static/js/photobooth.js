@@ -8,7 +8,7 @@ const sharePanel = document.getElementById('sharePanel');
 const emailBtn = document.getElementById('emailBtn');
 const smsBtn = document.getElementById('smsBtn');
 
-const settings = window.APP_SETTINGS || { tts: { enabled: true, prompt: 'Get ready!' } };
+const settings = window.APP_SETTINGS || { tts: { enabled: true, prompt: 'Get ready!', voice: 'default' } };
 
 let currentFrameImg = null;
 

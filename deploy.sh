@@ -209,28 +209,28 @@ def fetch_json():
             last = e
     raise RuntimeError(f"Failed to fetch voices.json: {last}")
 
+def collect_entries(node):
+    results = []
+    if isinstance(node, dict):
+        files = node.get('files') if isinstance(node.get('files'), dict) else None
+        if files and isinstance(files.get('onnx'), str):
+            gender = node.get('gender') or (node.get('voice') or {}).get('gender') or ''
+            results.append((files['onnx'], str(gender).lower()))
+        for v in node.values():
+            results.extend(collect_entries(v))
+    elif isinstance(node, list):
+        for v in node:
+            results.extend(collect_entries(v))
+    return results
+
 def extract_models(data):
-    # data: { lang_variant: { voiceName: { quality: { files: { 'onnx': url }, 'gender': 'male' } } } }
     picks = []
     for prefix in LANG_PREFIXES:
-        # collect all voice entries for this language prefix
         entries = []
         for lang_key, voices in (data or {}).items():
-            if not isinstance(voices, dict):
-                continue
             if not str(lang_key).lower().startswith(prefix.lower()):
                 continue
-            for voice_key, variants in voices.items():
-                if not isinstance(variants, dict):
-                    continue
-                # choose highest quality available first
-                for quality_key, meta in variants.items():
-                    files = (meta or {}).get('files') or {}
-                    onnx = files.get('onnx')
-                    if not onnx:
-                        continue
-                    gender = (meta or {}).get('gender') or (meta or {}).get('voice', {}).get('gender') or ''
-                    entries.append((onnx, str(gender).lower()))
+            entries.extend(collect_entries(voices))
         # pick male and female if possible, else first two
         male = next((u for u,g in entries if 'male' in g), None)
         female = next((u for u,g in entries if 'female' in g), None)
@@ -239,7 +239,6 @@ def extract_models(data):
             chosen.append(female)
         if male and male not in chosen:
             chosen.append(male)
-        # fill up to 2
         for u,_ in entries:
             if len(chosen) >= 2:
                 break

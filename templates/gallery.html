@@ -2,61 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Gallery</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .header { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(11,16,32,0.6); backdrop-filter: blur(8px); z-index: 20; }
-    .header-inner { display: flex; align-items: center; justify-content: space-between; }
-    .brand { font-weight: 700; letter-spacing: 0.3px; }
-    .nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
-    .nav a:hover { color: var(--text); }
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
   </style>
 </head>
-<body>
-  <header class="header">
-    <div class="container header-inner">
-      <div class="brand">📸 Virtual Photobooth</div>
-      <nav class="nav">
-        <a href="{{ url_for('photobooth.index') }}">Photobooth</a>
-        <a href="{{ url_for('gallery.gallery') }}">Gallery</a>
-        <a href="{{ url_for('settings.settings_page') }}">Settings</a>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-slate-950/70 border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="{{ url_for('photobooth.index') }}" class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-400 grid place-items-center shadow-lg shadow-indigo-500/30">📸</div>
+        <span class="text-lg font-semibold tracking-tight">Virtual Photobooth</span>
+      </a>
+      <nav class="flex items-center gap-3">
+        <a class="px-3 py-2 rounded-lg hover:bg-white/5 transition" href="{{ url_for('photobooth.index') }}">Photobooth</a>
+        <a class="px-3 py-2 rounded-lg hover:bg-white/5 transition" href="{{ url_for('gallery.gallery') }}">Gallery</a>
+        <a class="px-3 py-2 rounded-lg hover:bg-white/5 transition" href="{{ url_for('settings.settings_page') }}">Settings</a>
       </nav>
     </div>
   </header>
-  <main class="container">
-    <section class="card">
-      <h1>Gallery</h1>
-      <div class="gallery-grid">
+
+  <main class="max-w-7xl mx-auto px-6 py-10">
+    <div class="mb-8">
+      <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Gallery</h1>
+      <p class="text-slate-400 mt-2">Browse your snaps and share them via email or SMS.</p>
+    </div>
+
+    <section class="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6 shadow-xl shadow-black/20">
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {% for p in photos %}
-        <div class="gallery-item">
-          <img src="{{ url_for('photobooth.get_photo', filename=p) }}" alt="photo" />
-          <div class="share-row">
-            <input type="email" placeholder="Email" data-email />
-            <button class="btn" data-email-btn data-filename="{{ p }}">Send Email</button>
+        <article class="group rounded-xl overflow-hidden border border-white/10 bg-slate-900/60">
+          <img class="w-full aspect-[4/3] object-cover object-center group-hover:opacity-95 transition" src="{{ url_for('photobooth.get_photo', filename=p) }}" alt="photo" />
+          <div class="p-4 space-y-3">
+            <div class="flex gap-2">
+              <input type="email" placeholder="Email" data-email class="flex-1 bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <button class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition" data-email-btn data-filename="{{ p }}">Send Email</button>
+            </div>
+            <div class="flex gap-2">
+              <input type="tel" placeholder="Phone" data-phone class="flex-1 bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <button class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition" data-sms-btn data-filename="{{ p }}">Send SMS</button>
+            </div>
           </div>
-          <div class="share-row">
-            <input type="tel" placeholder="Phone" data-phone />
-            <button class="btn" data-sms-btn data-filename="{{ p }}">Send SMS</button>
-          </div>
-        </div>
+        </article>
         {% else %}
-        <p>No photos yet. Take one on the Photobooth page.</p>
+        <div class="text-slate-400">No photos yet. Take one on the Photobooth page.</div>
         {% endfor %}
       </div>
     </section>
   </main>
-  <footer class="footer">
-    <div class="container">Made with ❤️</div>
+
+  <footer class="border-t border-white/10">
+    <div class="max-w-7xl mx-auto px-6 py-6 text-slate-400">Made with ❤️</div>
   </footer>
+
   <script>
     document.querySelectorAll('[data-email-btn]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const filename = btn.dataset.filename;
-        const email = btn.closest('.gallery-item').querySelector('[data-email]').value;
+        const email = btn.closest('article').querySelector('[data-email]').value;
         const res = await fetch('/api/share/email', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filename, email })
@@ -67,7 +75,7 @@
     document.querySelectorAll('[data-sms-btn]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const filename = btn.dataset.filename;
-        const phone = btn.closest('.gallery-item').querySelector('[data-phone]').value;
+        const phone = btn.closest('article').querySelector('[data-phone]').value;
         const res = await fetch('/api/share/sms', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filename, phone })

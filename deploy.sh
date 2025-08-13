@@ -186,27 +186,17 @@ info "Starting stack..."
 $DC up -d
 success "Services started"
 
-# 5) Preload common Piper models (lightweight selection)
+# 5) Preload common Piper models (lightweight selection) using Hugging Face client inside Docker
 info "Preloading common Piper models (if missing)..."
-PY_BIN=$(command -v python3 || command -v python)
-if [[ -n "$PY_BIN" ]]; then
-"$PY_BIN" - <<'PY'
-import os, json, urllib.request, urllib.error, sys, subprocess
-try:
-    from huggingface_hub import hf_hub_download
-except Exception:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'huggingface_hub'])
-    from huggingface_hub import hf_hub_download
+MODEL_DIR="$APP_DIR/piper/models"
+mkdir -p "$MODEL_DIR"
+docker run --rm -e HF_HUB_DISABLE_TELEMETRY=1 -v "$MODEL_DIR":/models python:3.11-slim bash -lc "pip install --no-cache-dir --upgrade pip >/dev/null 2>&1 && pip install --no-cache-dir huggingface_hub >/dev/null 2>&1 && python - <<'PY'
+import os, json
+from huggingface_hub import hf_hub_download
 REPO = 'rhasspy/piper-voices'
-
-VOICES_JSON_URLS = [
-  'https://huggingface.co/rhasspy/piper-voices/resolve/main/voices.json',
-  'https://raw.githubusercontent.com/rhasspy/piper-voices/main/voices.json',
-]
 LANG_PREFIXES = ['en', 'de', 'es', 'it', 'zh', 'ja', 'ko', 'ru']
 
-def fetch_json():
-    # Use huggingface_hub to fetch voices.json reliably
+def load_voices_json():
     path = hf_hub_download(REPO, filename='voices.json')
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -216,14 +206,15 @@ def collect_entries(node, lang_hint=None):
     if isinstance(node, dict):
         files = node.get('files') if isinstance(node.get('files'), dict) else None
         if files and isinstance(files.get('onnx'), str):
-            onnx = files['onnx']
+            onnx_url = files['onnx']
+            rel = onnx_url.split('/main/', 1)[-1]
             gender = (node.get('gender') or (node.get('voice') or {}).get('gender') or '').lower()
-            lang_prefix = (lang_hint or '')[:2]
-            if not lang_prefix and isinstance(onnx, str):
-                base = os.path.basename(onnx)
+            lang_prefix = (lang_hint or '').lower()[:2]
+            if not lang_prefix:
+                base = os.path.basename(rel)
                 guess = base.split('-', 1)[0].split('_', 1)[0]
                 lang_prefix = guess.lower()[:2]
-            results.append((lang_prefix, onnx, gender))
+            results.append((lang_prefix, rel, gender))
         for v in node.values():
             results.extend(collect_entries(v, lang_hint=lang_hint))
     elif isinstance(node, list):
@@ -231,78 +222,72 @@ def collect_entries(node, lang_hint=None):
             results.extend(collect_entries(v, lang_hint=lang_hint))
     return results
 
-def extract_models(data):
-    # Walk top-level by language keys when possible to preserve language mapping
+def pick_urls(data):
     all_entries = []
     for lang_key, voices in (data or {}).items():
         if not isinstance(voices, (dict, list)):
             continue
-        lang_hint = str(lang_key).split('-', 1)[0].split('_', 1)[0].lower()
-        all_entries.extend(collect_entries(voices, lang_hint=lang_hint))
+        hint = str(lang_key).split('-', 1)[0].split('_', 1)[0]
+        all_entries.extend(collect_entries(voices, lang_hint=hint))
     picks = []
     for prefix in LANG_PREFIXES:
-        entries = [(u,g) for lp,u,g in all_entries if lp == prefix]
+        entries = [(rel, gender) for lp, rel, gender in all_entries if lp == prefix]
         if not entries:
             continue
-        male = next((u for u,g in entries if 'male' in g), None)
-        female = next((u for u,g in entries if 'female' in g), None)
+        male = next((rel for rel,g in entries if 'male' in g), None)
+        female = next((rel for rel,g in entries if 'female' in g), None)
         chosen = []
         if female:
             chosen.append(female)
         if male and male not in chosen:
             chosen.append(male)
-        for u,_ in entries:
+        for rel,_ in entries:
             if len(chosen) >= 2:
                 break
-            if u not in chosen:
-                chosen.append(u)
+            if rel not in chosen:
+                chosen.append(rel)
         picks.extend(chosen)
-    return picks
-
-def download(url, dest_dir):
-    os.makedirs(dest_dir, exist_ok=True)
-    # Map full URL to repo-relative path and download via huggingface_hub
-    rel = url.split('/main/', 1)[-1]
-    local_path = hf_hub_download(REPO, filename=rel)
-    fname = os.path.basename(local_path)
-    dest = os.path.join(dest_dir, fname)
-    if os.path.exists(dest):
-        return False
-    with open(local_path, 'rb') as src, open(dest, 'wb') as dst:
-        dst.write(src.read())
-    # Try to get accompanying config JSON
-    try:
-        cfg_local = hf_hub_download(REPO, filename=rel + '.json')
-        cfg_name = os.path.basename(cfg_local)
-        cfg_dest = os.path.join(dest_dir, cfg_name)
-        if not os.path.exists(cfg_dest):
-            with open(cfg_local, 'rb') as src, open(cfg_dest, 'wb') as dst:
-                dst.write(src.read())
-    except Exception:
-        pass
-    return True
+    # de-dupe while preserving order
+    seen = set(); out = []
+    for rel in picks:
+        if rel not in seen:
+            seen.add(rel); out.append(rel)
+    return out
 
 def main():
-    data = fetch_json()
-    urls = list(dict.fromkeys(extract_models(data)))  # de-dupe, keep order
-    app_dir = os.path.dirname(os.path.abspath(__file__))
-    target = os.path.join(app_dir, 'piper', 'models')
+    data = load_voices_json()
+    rel_files = pick_urls(data)
+    target = '/models'
+    os.makedirs(target, exist_ok=True)
     downloaded = 0
-    for u in urls:
+    for rel in rel_files:
         try:
-            if download(u, target):
+            model_path = hf_hub_download(REPO, filename=rel)
+            base = os.path.basename(model_path)
+            dest = os.path.join(target, base)
+            if not os.path.exists(dest):
+                with open(model_path, 'rb') as src, open(dest, 'wb') as dst:
+                    dst.write(src.read())
                 downloaded += 1
-                print('Downloaded', os.path.basename(u))
+                print('Downloaded', base)
+            # fetch config JSON if present
+            cfg_rel = rel + '.json'
+            try:
+                cfg_path = hf_hub_download(REPO, filename=cfg_rel)
+                cfg_base = os.path.basename(cfg_path)
+                cfg_dest = os.path.join(target, cfg_base)
+                if not os.path.exists(cfg_dest):
+                    with open(cfg_path, 'rb') as src, open(cfg_dest, 'wb') as dst:
+                        dst.write(src.read())
+            except Exception:
+                pass
         except Exception as e:
-            print('Failed', u, e)
+            print('Failed', rel, e)
     print(f'Preload complete, {downloaded} file(s) downloaded to {target}')
 
 if __name__ == '__main__':
     main()
-PY
-else
-	warn "Python not found; skipping Piper model preload"
-fi
+PY"
 
 # 5) Post-deploy info
 WEB_CONTAINER=$($DC ps -q web || true)

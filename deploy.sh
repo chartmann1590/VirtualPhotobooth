@@ -204,9 +204,22 @@ def pick_files():
     picks = []
     for lang in LANG_DIRS:
         lang_files = [f for f in onnx if f.startswith(lang + '/')]
-        lang_files.sort(key=lambda x: (0 if ('-low.onnx' in x or '-low.onnx.gz' in x) else 1, x))
-        for f in lang_files[:2]:
+        # prefer low models; ensure different voice names (2nd token before quality)
+        def voice_token(path):
+            base = os.path.basename(path)
+            name = base.replace('.onnx', '').replace('.gz', '')
+            parts = name.split('-')
+            return parts[1] if len(parts) > 1 else name
+        lang_files.sort(key=lambda x: (0 if ('-low.onnx' in x or '-low.onnx.gz' in x) else 1, voice_token(x), x))
+        chosen_tokens = set()
+        for f in lang_files:
+            vt = voice_token(f)
+            if vt in chosen_tokens:
+                continue
             picks.append(f)
+            chosen_tokens.add(vt)
+            if len(chosen_tokens) >= 2:
+                break
     # de-dupe preserve order
     seen = set(); out = []
     for f in picks:

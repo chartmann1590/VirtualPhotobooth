@@ -1,5 +1,6 @@
 import io
 import os
+import time
 import subprocess
 import tempfile
 import requests
@@ -61,6 +62,8 @@ def tts_speak():
         config_path = model_path + '.json'
         if os.path.exists(config_path):
             cmd[1:1] = ['--config', config_path]
+        # Reset seed between calls to avoid identical-sounding outputs across different models
+        cmd[1:1] = ['--seed', str(int(time.time() * 1000) % 2147483647)]
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # Try to transcode to mp3 if ffmpeg exists
         mp3_path = wav_path.replace('.wav', '.mp3')

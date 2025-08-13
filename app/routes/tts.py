@@ -12,7 +12,17 @@ bp = Blueprint('tts', __name__)
 
 def _get_piper_model() -> str:
     settings = SettingsStore(current_app.config['SETTINGS_PATH']).read()
-    return settings.get('tts', {}).get('piper_model', '/app/piper/models/en_US-amy-low.onnx')
+    configured = settings.get('tts', {}).get('piper_model')
+    if configured and os.path.exists(configured):
+        return configured
+    # Auto-pick first available .onnx under models directory
+    models_dir = '/app/piper/models'
+    for root, _, files in os.walk(models_dir):
+        for f in files:
+            if f.endswith('.onnx'):
+                return os.path.join(root, f)
+    # Fallback to a likely path; may fail if not present
+    return '/app/piper/models/en/en_US-amy-low.onnx'
 
 
 @bp.get('/api/tts/voices')
@@ -34,7 +44,10 @@ def list_voices():
 def tts_speak():
     text = request.args.get('text') or 'Hello'
     model_rel = request.args.get('voice') or None
-    model_path = os.path.join('/app/piper/models', model_rel) if model_rel else _get_piper_model()
+    if model_rel and not os.path.isabs(model_rel):
+        model_path = os.path.join('/app/piper/models', model_rel)
+    else:
+        model_path = model_rel or _get_piper_model()
     # Use piper CLI to synthesize to WAV, then convert to MP3 with ffmpeg if available, else return WAV
     try:
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmpwav:

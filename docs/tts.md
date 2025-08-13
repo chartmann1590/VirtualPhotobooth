@@ -17,7 +17,8 @@ The app supports two free TTS engines:
 ## Piper Notes
 - Deploy script auto-downloads common models for English, German, Spanish, Italian, Chinese, Japanese, Korean, and Russian (male/female when available)
 - Place additional `.onnx` models into `piper/models/` (mounted into containers)
-- You can list voices in Settings and preview instantly
+- Select the model filename (e.g., `en_US-amy-low.onnx`) in Settings → TTS → Voice
+- If models sound similar, try different model files; some locales/qualities can be close
 
 ## Browser Notes
 - Install OS voices for more natural speech:

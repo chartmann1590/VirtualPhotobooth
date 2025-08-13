@@ -1,15 +1,5 @@
 version: '3.9'
 services:
-  piper:
-    image: rhasspy/wyoming-piper:latest
-    environment:
-      - TZ=UTC
-    volumes:
-      - ./piper/models:/app/piper/models:ro
-    ports:
-      - "5500:5500"
-    restart: unless-stopped
-
   web:
     build:
       context: .

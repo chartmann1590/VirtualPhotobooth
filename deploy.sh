@@ -107,6 +107,7 @@ set_env_var() {
 }
 
 # 2) Ensure .env exists or offer to replace
+SKIP_ADMIN_PROMPT=0
 if [[ -f "$ENV_FILE" ]]; then
 	info ".env already exists."
 	read -r -p "Do you want to use the existing .env? [Y/n]: " USE_EXISTING
@@ -124,6 +125,7 @@ if [[ -f "$ENV_FILE" ]]; then
 		fi
 	else
 		info "Keeping existing .env"
+		SKIP_ADMIN_PROMPT=1
 	fi
 else
 	if [[ -f "$APP_DIR/.env.example" ]]; then
@@ -135,24 +137,28 @@ else
 	fi
 fi
 
-# 2b) Offer to set ADMIN_PASSWORD
-read -r -p "Do you want to set ADMIN_PASSWORD now? [Y/n]: " SET_ADMIN
-SET_ADMIN=${SET_ADMIN:-Y}
-if [[ "$SET_ADMIN" =~ ^[Nn]$ ]]; then
-	info "Using default ADMIN_PASSWORD=admin123"
-	set_env_var ADMIN_PASSWORD admin123 "$ENV_FILE"
+# 2b) Offer to set ADMIN_PASSWORD only when creating/replacing .env
+if [[ "$SKIP_ADMIN_PROMPT" -eq 0 ]]; then
+	read -r -p "Do you want to set ADMIN_PASSWORD now? [Y/n]: " SET_ADMIN
+	SET_ADMIN=${SET_ADMIN:-Y}
+	if [[ "$SET_ADMIN" =~ ^[Nn]$ ]]; then
+		info "Using default ADMIN_PASSWORD=admin123"
+		set_env_var ADMIN_PASSWORD admin123 "$ENV_FILE"
+	else
+		while true; do
+			read -r -s -p "Enter ADMIN_PASSWORD: " APW; echo
+			read -r -s -p "Confirm ADMIN_PASSWORD: " APW2; echo
+			if [[ "$APW" == "$APW2" && -n "$APW" ]]; then
+				set_env_var ADMIN_PASSWORD "$APW" "$ENV_FILE"
+				success "ADMIN_PASSWORD set in .env"
+				break
+			else
+				warn "Passwords did not match or were empty. Please try again."
+			fi
+		done
+	fi
 else
-	while true; do
-		read -r -s -p "Enter ADMIN_PASSWORD: " APW; echo
-		read -r -s -p "Confirm ADMIN_PASSWORD: " APW2; echo
-		if [[ "$APW" == "$APW2" && -n "$APW" ]]; then
-			set_env_var ADMIN_PASSWORD "$APW" "$ENV_FILE"
-			success "ADMIN_PASSWORD set in .env"
-			break
-		else
-			warn "Passwords did not match or were empty. Please try again."
-		fi
-	done
+	info "Using ADMIN_PASSWORD from existing .env"
 fi
 
 # 3) Generate self-signed certificate if absent

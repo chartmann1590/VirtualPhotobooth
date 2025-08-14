@@ -175,6 +175,7 @@
       const previewInput = document.getElementById('ttsPreviewInput');
       const promptInput = document.getElementById('ttsPromptInput');
       const piperModelRow = document.getElementById('piperModelRow');
+      const piperModelInput = document.querySelector('input[name="piper_model"]');
 
       function listVoicesBrowser() {
         const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
@@ -208,7 +209,7 @@
           const res = await fetch('/api/tts/voices');
           const data = await res.json();
           const voices = Array.isArray(data) ? data : (data.voices || []);
-          voices.forEach(v => {
+          voices.filter(v => typeof v === 'string' && v.endsWith('.onnx')).forEach(v => {
             const id = typeof v === 'string' ? v : (v.name || v.id || v.voice || '');
             const opt = document.createElement('option');
             opt.value = id;
@@ -222,11 +223,16 @@
             opt.textContent = 'en_US-amy-low.onnx';
             select.appendChild(opt);
           }
+          // Sync model input with current selection
+          if (piperModelInput && select.value) {
+            piperModelInput.value = select.value;
+          }
         } catch (e) {
           const opt = document.createElement('option');
           opt.value = 'en_US-amy-low.onnx';
           opt.textContent = 'en_US-amy-low.onnx';
           select.appendChild(opt);
+          if (piperModelInput) piperModelInput.value = 'en_US-amy-low.onnx';
         }
       }
 
@@ -245,6 +251,13 @@
 
       refreshVoiceList();
       engineSelect && engineSelect.addEventListener('change', refreshVoiceList);
+      // Update piper model input when selection changes
+      select && select.addEventListener('change', () => {
+        const engine = engineSelect ? engineSelect.value : 'browser';
+        if (engine === 'piper' && piperModelInput) {
+          piperModelInput.value = select.value || '';
+        }
+      });
 
       function speak(text) {
         if (!window.speechSynthesis) return;
@@ -260,7 +273,7 @@
         previewBtn.addEventListener('click', () => {
           const text = (previewInput && previewInput.value) || (promptInput && promptInput.value) || 'Hello! This is a voice preview.';
           const engine = engineSelect ? engineSelect.value : 'browser';
-          if (engine === 'opentts') {
+          if (engine === 'piper') {
             const q = new URLSearchParams({ text, voice: select ? select.value : '' });
             const audio = new Audio(`/api/tts/speak?${q.toString()}`);
             audio.play();

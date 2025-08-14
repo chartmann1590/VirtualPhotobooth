@@ -51,7 +51,11 @@ def settings_page():
         data['tts']['engine'] = request.form.get('tts_engine', data['tts'].get('engine', 'browser'))
         data['tts']['voice'] = request.form.get('tts_voice', 'default')
         data['tts']['prompt'] = request.form.get('tts_prompt', 'Get ready! The photo will start soon.')
-        data['tts']['piper_model'] = request.form.get('piper_model', data['tts'].get('piper_model', '/app/piper/models/en_US-amy-low.onnx'))
+        # Normalize Piper model to full absolute path inside container
+        piper_model_in = request.form.get('piper_model', data['tts'].get('piper_model', ''))
+        if piper_model_in and not os.path.isabs(piper_model_in):
+            piper_model_in = os.path.join('/app/piper/models', piper_model_in)
+        data['tts']['piper_model'] = piper_model_in or '/app/piper/models/en_US-amy-low.onnx'
         store.write(data)
 
         if 'frame' in request.files:

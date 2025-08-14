@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
@@ -16,6 +17,12 @@ def create_app() -> Flask:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['PHOTOS_FOLDER'], exist_ok=True)
     os.makedirs(os.path.dirname(app.config['SETTINGS_PATH']), exist_ok=True)
+
+    # Logging setup
+    log_level_name = os.getenv('LOG_LEVEL', 'INFO').upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+    logging.basicConfig(level=log_level, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+    logging.getLogger('werkzeug').setLevel(logging.WARNING if log_level > logging.DEBUG else logging.DEBUG)
 
     # Blueprints
     from .routes.photobooth import bp as photobooth_bp

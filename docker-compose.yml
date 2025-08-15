@@ -1,30 +1,39 @@
-version: '3.9'
+version: '3.8'
+
 services:
   web:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
-    env_file:
-      - .env
+    container_name: photobooth-web
+    restart: unless-stopped
     volumes:
+      - ./static/frames:/app/static/frames
       - ./photos:/app/photos
       - ./config:/app/config
-      - ./static/frames:/app/static/frames
-      - ./piper/models:/app/piper/models:ro
-    expose:
-      - "8000"
-    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+    networks:
+      - photobooth
 
   nginx:
     build:
       context: .
       dockerfile: docker/Dockerfile.nginx
-    depends_on:
-      - web
-    volumes:
-      - ./static:/app/static:ro
-      - ./docker/certs:/etc/nginx/ssl:ro
+    container_name: photobooth-nginx
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-    restart: unless-stopped
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro
+      - ./static:/var/www/static:ro
+    depends_on:
+      - web
+    networks:
+      - photobooth
+
+networks:
+  photobooth:
+    driver: bridge

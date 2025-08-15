@@ -88,7 +88,7 @@ Upload transparent PNG frames via Settings. The camera view is masked to the tra
 - Storage: Local `photos/` directory; app settings persisted to `config/settings.json`
 - Email: SMTP via `smtplib`
 - SMS: SMSGate REST API (`/3rdparty/v1/message`) with Basic Auth
-- TTS: Browser Web Speech API, or Piper (lightweight neural TTS in Docker)
+- TTS: Browser Web Speech API, Google Translate TTS, Microsoft Edge TTS, and ElevenLabs (free tier)
 
 ## Security
 - Admin Settings protected by password (`ADMIN_PASSWORD`)

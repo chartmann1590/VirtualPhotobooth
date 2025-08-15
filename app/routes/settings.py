@@ -48,14 +48,11 @@ def settings_page():
         data['sms']['username'] = request.form.get('sms_username', '')
         data['sms']['password'] = request.form.get('sms_password', '')
         data['tts']['enabled'] = request.form.get('tts_enabled') == 'on'
-        data['tts']['engine'] = request.form.get('tts_engine', data['tts'].get('engine', 'browser'))
-        data['tts']['voice'] = request.form.get('tts_voice', 'default')
+        data['tts']['engine'] = request.form.get('tts_engine', data['tts'].get('engine', 'google'))
+        data['tts']['service'] = request.form.get('tts_service', data['tts'].get('service', 'google'))
+        data['tts']['voice'] = request.form.get('tts_voice', 'en')
         data['tts']['prompt'] = request.form.get('tts_prompt', 'Get ready! The photo will start soon.')
-        # Normalize Piper model to full absolute path inside container
-        piper_model_in = request.form.get('piper_model', data['tts'].get('piper_model', ''))
-        if piper_model_in and not os.path.isabs(piper_model_in):
-            piper_model_in = os.path.join('/app/piper/models', piper_model_in)
-        data['tts']['piper_model'] = piper_model_in or '/app/piper/models/en_US-amy-low.onnx'
+        data['tts']['elevenlabs_api_key'] = request.form.get('elevenlabs_api_key', '')
         store.write(data)
 
         if 'frame' in request.files:

@@ -47,46 +47,76 @@ function drawOverlayMask(frameImg) {
   ctx.drawImage(frameImg, 0, 0, overlay.width, overlay.height);
 }
 
-function speak(text) {
-  if (!settings.tts || !settings.tts.enabled) return;
-  const utter = new SpeechSynthesisUtterance(text);
-  if (settings.tts.voice && settings.tts.voice !== 'default') {
-    const v = speechSynthesis.getVoices().find(v => v.name === settings.tts.voice);
-    if (v) utter.voice = v;
-  }
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utter);
-}
-
-async function speakViaServer(text) {
-  try {
-    const voice = settings.tts?.voice || '';
-    const q = new URLSearchParams({ text: text || 'Hello', voice });
-    const res = await fetch(`/api/tts/speak?${q.toString()}`);
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    await audio.play();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-  } catch (e) {
-    // fallback to browser TTS on failure
-    speak(text);
-  }
-}
+    // TTS functionality
+    function speakWithTTS(text, voice = null) {
+        if (!ttsEnabled) return;
+        
+        const engine = ttsEngine || 'browser';
+        const service = ttsService || 'google';
+        
+        if (engine === 'browser') {
+            // Use browser TTS
+            if (window.speechSynthesis) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                if (voice) {
+                    const voices = speechSynthesis.getVoices();
+                    const selectedVoice = voices.find(v => v.name === voice);
+                    if (selectedVoice) utterance.voice = selectedVoice;
+                }
+                speechSynthesis.cancel();
+                speechSynthesis.speak(utterance);
+            }
+        } else if (engine === 'remote') {
+            // Use remote TTS service
+            const params = new URLSearchParams({
+                text: text,
+                service: service,
+                voice: voice || getDefaultVoice(service)
+            });
+            
+            const audio = new Audio(`/api/tts/speak?${params.toString()}`);
+            audio.play().catch(e => console.error('TTS audio play failed:', e));
+        }
+    }
+    
+    function getDefaultVoice(service) {
+        switch (service) {
+            case 'google': return 'en';
+            case 'microsoft': return 'en-US-JennyNeural';
+            case 'elevenlabs': return '21m00Tcm4TlvDq8ikWAM';
+            default: return 'en';
+        }
+    }
 
 async function countdown(seconds) {
-  for (let i = seconds; i >= 1; i--) {
-    countdownEl.textContent = i;
-    countdownEl.hidden = false;
-    if ((settings.tts?.engine || 'browser') === 'opentts') {
-      await speakViaServer(String(i));
-    } else {
-      speak(String(i));
-    }
-    await new Promise(r => setTimeout(r, 1000));
+  if (countdownActive) return;
+  countdownActive = true;
+  
+  // Speak the prompt first
+  if (ttsEnabled && ttsPrompt) {
+    speakWithTTS(ttsPrompt);
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for prompt to finish
   }
-  countdownEl.hidden = true;
+  
+  for (let i = seconds; i > 0; i--) {
+    if (!countdownActive) break;
+    
+    // Update countdown display
+    countdownDisplay.textContent = i;
+    countdownDisplay.classList.remove('hidden');
+    
+    // Speak the countdown number
+    if (ttsEnabled) {
+      speakWithTTS(i.toString());
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  if (countdownActive) {
+    countdownDisplay.classList.add('hidden');
+    takePhoto();
+  }
 }
 
 async function capture() {

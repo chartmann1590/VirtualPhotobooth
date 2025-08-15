@@ -19,10 +19,11 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     },
     "tts": {
         "enabled": True,
-        "engine": os.getenv('TTS_ENGINE', 'browser'),  # 'browser' or 'piper'
-        "voice": "default",
+        "engine": os.getenv('TTS_ENGINE', 'google'),  # 'google', 'microsoft', 'elevenlabs', or 'browser'
+        "service": os.getenv('TTS_SERVICE', 'google'),  # 'google', 'microsoft', 'elevenlabs'
+        "voice": "en",  # Default voice for the selected service
         "prompt": "Get ready! The photo will start soon.",
-        "piper_model": os.getenv('PIPER_MODEL', '/app/piper/models/en_US-amy-low.onnx')
+        "elevenlabs_api_key": os.getenv('ELEVENLABS_API_KEY', '')  # API key for ElevenLabs
     }
 }
 

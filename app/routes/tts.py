@@ -317,7 +317,7 @@ def generate_ollama_prompt():
     
     url = ollama_config.get('url', '')
     api_key = ollama_config.get('api_key', '')
-    model = ollama_config.get('model', 'llama3.2')
+    model = ollama_config.get('model', '')  # Can be empty, will auto-select
     
     if not url:
         return jsonify({"error": "Ollama URL not configured"}), 400
@@ -332,7 +332,7 @@ def generate_ollama_prompt():
         return jsonify({
             "status": "success",
             "prompt": prompt,
-            "model": model
+            "model": model or "auto-selected"
         })
         
     except Exception as e:

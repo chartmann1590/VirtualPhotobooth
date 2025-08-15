@@ -29,7 +29,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "ollama": {
         "enabled": False,
         "url": os.getenv('OLLAMA_URL', 'http://localhost:11434'),  # Remote Ollama URL
-        "model": os.getenv('OLLAMA_MODEL', 'llama3.2'),  # Default model
+        "model": "",  # Will be selected from available models on server
         "api_key": os.getenv('OLLAMA_API_KEY', '')  # API key if required
     }
 }

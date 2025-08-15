@@ -41,12 +41,10 @@ The Virtual Photobooth now includes AI-powered prompt generation using Ollama! T
   - Example: `https://ollama.example.com`
 
 ### 3. **Select Model**
-Choose from available models:
-- **llama3.2** (recommended) - Best balance of quality and speed
-- **llama3.1** - Good quality, slightly faster
-- **llama2** - Reliable, well-tested
-- **mistral** - Fast, good for creative tasks
-- **codellama** - Good for structured prompts
+- Models are automatically loaded from your Ollama server
+- No preloaded options - only shows models actually available on your server
+- Select from the dropdown of available models
+- If no model is selected, the system will auto-select the first available model
 
 ### 4. **API Key (if required)**
 - Some hosted Ollama services require API keys
@@ -120,6 +118,18 @@ docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ol
     "url": "https://ollama.yourdomain.com",
     "model": "llama3.2",
     "api_key": "your-api-key-here"
+  }
+}
+```
+
+### **Auto-Select Model Configuration**
+```json
+{
+  "ollama": {
+    "enabled": true,
+    "url": "http://192.168.1.100:11434",
+    "model": "",
+    "api_key": ""
   }
 }
 ```

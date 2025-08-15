@@ -37,6 +37,15 @@ class OllamaService:
     def generate_prompt(self, model: str, context: str = "") -> str:
         """Generate a funny and informative photobooth prompt using Ollama"""
         
+        # If no model is specified, try to get the first available model
+        if not model:
+            models = self.list_models()
+            if models:
+                model = models[0]['name']
+            else:
+                logger.error("No models available on Ollama server")
+                return self._get_fallback_prompt()
+        
         system_prompt = """You are a fun and engaging AI assistant for a photobooth. Your job is to generate short, funny, and informative prompts that will be spoken to people before they take a photo.
 
 The prompt should:
@@ -94,23 +103,26 @@ Generate a new, creative prompt that's different from the examples above."""
                 return prompt
             else:
                 logger.error("Unexpected Ollama response format")
-                return "Get ready for your close-up! 📸"
+                return self._get_fallback_prompt()
                 
         except Exception as e:
             logger.error(f"Failed to generate Ollama prompt: {str(e)}")
-            # Fallback prompts
-            fallback_prompts = [
-                "Strike a pose that says 'I woke up like this'! 📸",
-                "Show me your best superhero landing pose! 🦸‍♂️",
-                "Channel your inner rockstar and give us attitude! 🎸",
-                "Pretend you just won the lottery! 🎉",
-                "Look like you're about to drop the hottest album of 2024! 🎵",
-                "Give us your best 'I just had the best idea ever' face! 💡",
-                "Pose like you're about to save the world! 🌍",
-                "Show us your 'I'm too cool for school' look! 😎"
-            ]
-            import random
-            return random.choice(fallback_prompts)
+            return self._get_fallback_prompt()
+    
+    def _get_fallback_prompt(self) -> str:
+        """Get a fallback prompt when AI generation fails"""
+        fallback_prompts = [
+            "Strike a pose that says 'I woke up like this'! 📸",
+            "Show me your best superhero landing pose! 🦸‍♂️",
+            "Channel your inner rockstar and give us attitude! 🎸",
+            "Pretend you just won the lottery! 🎉",
+            "Look like you're about to drop the hottest album of 2024! 🎵",
+            "Give us your best 'I just had the best idea ever' face! 💡",
+            "Pose like you're about to save the world! 🌍",
+            "Show us your 'I'm too cool for school' look! 😎"
+        ]
+        import random
+        return random.choice(fallback_prompts)
     
     def test_connection(self) -> bool:
         """Test if Ollama service is accessible"""

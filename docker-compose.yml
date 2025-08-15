@@ -7,6 +7,8 @@ services:
       dockerfile: docker/Dockerfile.web
     container_name: photobooth-web
     restart: unless-stopped
+    ports:
+      - "5000:5000"
     volumes:
       - ./static/frames:/app/static/frames
       - ./photos:/app/photos

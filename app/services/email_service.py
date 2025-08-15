@@ -19,7 +19,7 @@ def send_email_smtp(host: str, port: int, user: str, password: str, from_email: 
         with open(attachment_path, 'rb') as f:
             part.set_payload(f.read())
         encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f'attachment; filename="{attachment_path.split('/')[-1]}"')
+        part.add_header('Content-Disposition', f'attachment; filename="{attachment_path.split("/")[-1]}"')
         message.attach(part)
 
     with smtplib.SMTP(host, port) as server:

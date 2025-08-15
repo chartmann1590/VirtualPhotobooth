@@ -2,18 +2,18 @@
 
 A beautifully designed, modular Flask photobooth app.
 
-## Table of Contents
-- [Overview](./docs/overview.md)
-- [Quickstart](./docs/quickstart.md)
-- [Configuration](./docs/configuration.md)
-- [Frames](./docs/frames.md)
-- [Photobooth UX & TTS](./docs/tts.md)
-- [Email (SMTP) Setup](./docs/email_smtp.md)
-- [SMS (SMSGate) Setup](./docs/sms_gateway.md)
-- [Deployment (Docker)](./docs/deployment_docker.md)
-- [Operations](./docs/operations.md)
-- [Security](./SECURITY.md)
-- [License](./LICENSE)
+## Documentation
+
+- [Overview](./docs/overview.md) - Project overview and architecture
+- [Quick Start](./docs/quickstart.md) - Get up and running quickly
+- [Configuration](./docs/configuration.md) - Environment variables and settings
+- [Frames](./docs/frames.md) - Adding and managing photobooth frames
+- [Text-to-Speech](./docs/tts.md) - TTS setup and configuration
+- [Ollama AI](./docs/ollama.md) - AI-powered prompt generation
+- [Email & SMTP](./docs/email_smtp.md) - Email configuration
+- [SMS Gateway](./docs/sms_gateway.md) - SMS setup and configuration
+- [Docker Deployment](./docs/deployment_docker.md) - Container deployment guide
+- [Operations](./docs/operations.md) - Running and maintaining the application
 
 ## Highlights
 - Photobooth page with selectable frames, camera capture, 3-second countdown, and optional TTS guidance

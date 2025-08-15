@@ -6,3 +6,9 @@ photos/
 config/settings.json
 .env
 .DS_Store
+
+# SSL certificates (generated during deployment)
+docker/ssl/
+*.pem
+*.key
+*.crt

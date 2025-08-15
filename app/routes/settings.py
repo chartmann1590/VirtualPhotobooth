@@ -54,6 +54,12 @@ def settings_page():
         data['tts']['prompt'] = request.form.get('tts_prompt', 'Get ready! The photo will start soon.')
         data['tts']['elevenlabs_api_key'] = request.form.get('elevenlabs_api_key', '')
         data['tts']['microsoft_api_key'] = request.form.get('microsoft_api_key', '')
+        
+        # Ollama AI configuration
+        data['ollama']['enabled'] = request.form.get('ollama_enabled') == 'on'
+        data['ollama']['url'] = request.form.get('ollama_url', '')
+        data['ollama']['model'] = request.form.get('ollama_model', 'llama3.2')
+        data['ollama']['api_key'] = request.form.get('ollama_api_key', '')
         store.write(data)
 
         if 'frame' in request.files:

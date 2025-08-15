@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, jsonify, request, Response, send_file
 import logging
 
 from ..utils.settings_store import SettingsStore
+from ..services.ollama_service import OllamaService
 
 bp = Blueprint('tts', __name__)
 logger = logging.getLogger(__name__)
@@ -252,5 +253,90 @@ def list_services():
             'api_key_required': service.get('api_key_required', False)
         })
     return jsonify({"services": services})
+
+# Ollama AI endpoints
+@bp.get('/api/ollama/models')
+def list_ollama_models():
+    """List available Ollama models"""
+    settings = SettingsStore(current_app.config['SETTINGS_PATH']).read()
+    ollama_config = settings.get('ollama', {})
+    
+    if not ollama_config.get('enabled', False):
+        return jsonify({"error": "Ollama is not enabled"}), 400
+    
+    url = ollama_config.get('url', '')
+    api_key = ollama_config.get('api_key', '')
+    
+    if not url:
+        return jsonify({"error": "Ollama URL not configured"}), 400
+    
+    try:
+        service = OllamaService(url, api_key)
+        models = service.list_models()
+        return jsonify({"models": models})
+    except Exception as e:
+        logger.error(f"Failed to list Ollama models: {str(e)}")
+        return jsonify({"error": f"Failed to list models: {str(e)}"}), 500
+
+@bp.post('/api/ollama/test')
+def test_ollama_connection():
+    """Test Ollama connection"""
+    settings = SettingsStore(current_app.config['SETTINGS_PATH']).read()
+    ollama_config = settings.get('ollama', {})
+    
+    if not ollama_config.get('enabled', False):
+        return jsonify({"error": "Ollama is not enabled"}), 400
+    
+    url = ollama_config.get('url', '')
+    api_key = ollama_config.get('api_key', '')
+    
+    if not url:
+        return jsonify({"error": "Ollama URL not configured"}), 400
+    
+    try:
+        service = OllamaService(url, api_key)
+        is_connected = service.test_connection()
+        
+        if is_connected:
+            return jsonify({"status": "success", "message": "Ollama connection successful"})
+        else:
+            return jsonify({"status": "error", "message": "Ollama connection failed"}), 500
+            
+    except Exception as e:
+        logger.error(f"Ollama connection test failed: {str(e)}")
+        return jsonify({"status": "error", "message": f"Connection test failed: {str(e)}"}), 500
+
+@bp.post('/api/ollama/generate-prompt')
+def generate_ollama_prompt():
+    """Generate a photobooth prompt using Ollama"""
+    settings = SettingsStore(current_app.config['SETTINGS_PATH']).read()
+    ollama_config = settings.get('ollama', {})
+    
+    if not ollama_config.get('enabled', False):
+        return jsonify({"error": "Ollama is not enabled"}), 400
+    
+    url = ollama_config.get('url', '')
+    api_key = ollama_config.get('api_key', '')
+    model = ollama_config.get('model', 'llama3.2')
+    
+    if not url:
+        return jsonify({"error": "Ollama URL not configured"}), 400
+    
+    # Get context from request
+    context = request.json.get('context', '') if request.is_json else ''
+    
+    try:
+        service = OllamaService(url, api_key)
+        prompt = service.generate_prompt(model, context)
+        
+        return jsonify({
+            "status": "success",
+            "prompt": prompt,
+            "model": model
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to generate Ollama prompt: {str(e)}")
+        return jsonify({"error": f"Failed to generate prompt: {str(e)}"}), 500
 
 

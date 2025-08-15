@@ -88,13 +88,50 @@ function drawOverlayMask(frameImg) {
         }
     }
 
+    // AI Prompt Generation
+    async function generateAIPrompt() {
+        try {
+            const response = await fetch('/api/ollama/generate-prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: 'photobooth' })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // Update the prompt display
+                    const promptElement = document.getElementById('aiPromptDisplay');
+                    if (promptElement) {
+                        promptElement.textContent = data.prompt;
+                        promptElement.classList.remove('hidden');
+                    }
+                    
+                    // Store the generated prompt for TTS
+                    window.generatedPrompt = data.prompt;
+                    
+                    return data.prompt;
+                }
+            }
+        } catch (e) {
+            console.error('Failed to generate AI prompt:', e);
+        }
+        return null;
+    }
+
 async function countdown(seconds) {
   if (countdownActive) return;
   countdownActive = true;
   
+  // Use AI-generated prompt if available, otherwise use default
+  let promptToUse = ttsPrompt;
+  if (window.generatedPrompt && window.generatedPrompt.trim()) {
+    promptToUse = window.generatedPrompt;
+  }
+  
   // Speak the prompt first
-  if (ttsEnabled && ttsPrompt) {
-    speakWithTTS(ttsPrompt);
+  if (ttsEnabled && promptToUse) {
+    speakWithTTS(promptToUse);
     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for prompt to finish
   }
   

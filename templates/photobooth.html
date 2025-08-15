@@ -46,9 +46,17 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-6 py-10">
-    <div class="mb-8">
-      <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Step into the booth</h1>
-      <p class="text-slate-400 mt-2">Choose a frame, follow the countdown, snap a photo, and share instantly.</p>
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-white mb-4">Virtual Photobooth</h1>
+      <p class="text-xl text-slate-300">Strike a pose and capture the moment!</p>
+      
+      <!-- AI Prompt Display -->
+      <div id="aiPromptDisplay" class="hidden mt-4 p-4 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-xl border border-white/10">
+        <p class="text-lg text-white font-medium" id="aiPromptText"></p>
+        <button id="generateNewPromptBtn" class="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition">
+          Generate New Prompt
+        </button>
+      </div>
     </div>
 
     <div class="grid lg:grid-cols-2 gap-8">
@@ -113,84 +121,59 @@
     const html = htm.bind(h);
 
     const App = () => {
-      const [frames] = useState(() => ({{ frames | tojson | safe }} || []));
+      const [frames, setFrames] = useState([]);
       const [frame, setFrame] = useState('');
       const [shareFile, setShareFile] = useState('');
       const [showShare, setShowShare] = useState(false);
-      const videoRef = useRef(null);
-      const overlayRef = useRef(null);
-      const previewRef = useRef(null);
-      const countdownRef = useRef(null);
+      const [aiPrompt, setAiPrompt] = useState('');
+      const [showAiPrompt, setShowAiPrompt] = useState(false);
+      const videoRef = useRef();
+      const overlayRef = useRef();
+      const countdownRef = useRef();
+      const previewRef = useRef();
       const settings = window.APP_SETTINGS || {};
 
-      const speakBrowser = (text) => {
-        if (!settings.tts || !settings.tts.enabled) return;
-        const utter = new SpeechSynthesisUtterance(text);
-        if (settings.tts.voice && settings.tts.voice !== 'default') {
-          const v = speechSynthesis.getVoices().find(v => v.name === settings.tts.voice);
-          if (v) utter.voice = v;
-        }
-        speechSynthesis.cancel();
-        speechSynthesis.speak(utter);
-      };
-
-      const speakViaServer = async (text) => {
-        try {
-          const voice = settings.tts?.voice || 'default';
-          const q = new URLSearchParams({ text: text || 'Hello', voice });
-          const res = await fetch(`/api/tts/speak?${q.toString()}`);
-          if (!res.ok) return speakBrowser(text);
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
-          await audio.play();
-          setTimeout(() => URL.revokeObjectURL(url), 10000);
-        } catch { speakBrowser(text); }
-      };
-
-      const speak = (text) => {
-        if ((settings.tts?.engine || 'browser') === 'opentts') return speakViaServer(text);
-        return speakBrowser(text);
-      };
-
       useEffect(() => {
-        (async () => {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-          const video = videoRef.current;
-          video.srcObject = stream;
-          await video.play();
-          resize();
-        })();
-        const onResize = () => resize();
-        window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
+        fetch('/api/frames').then(r => r.json()).then(setFrames);
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+          videoRef.current.srcObject = stream;
+        });
       }, []);
 
-      useEffect(() => { drawOverlay(); }, [frame]);
-
-      const resize = () => {
-        const v = videoRef.current; if (!v) return;
-        const overlay = overlayRef.current; const preview = previewRef.current;
-        overlay.width = v.videoWidth; overlay.height = v.videoHeight;
-        preview.width = v.videoWidth; preview.height = v.videoHeight;
-        drawOverlay();
+      const generateAIPrompt = async () => {
+        try {
+          const response = await fetch('/api/ollama/generate-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context: 'photobooth' })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'success') {
+              setAiPrompt(data.prompt);
+              setShowAiPrompt(true);
+              // Store for TTS use
+              window.generatedPrompt = data.prompt;
+            }
+          }
+        } catch (e) {
+          console.error('Failed to generate AI prompt:', e);
+        }
       };
 
-      const drawOverlay = () => {
-        const overlay = overlayRef.current; if (!overlay) return;
-        const ctx = overlay.getContext('2d');
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
-        if (!frame) return;
-        const img = new Image();
-        img.onload = () => { ctx.drawImage(img, 0, 0, overlay.width, overlay.height); };
-        img.src = `/static/frames/${frame}`;
+      const speak = async (text) => {
+        if (!settings.tts?.enabled) return;
+        const utterance = new SpeechSynthesisUtterance(text);
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utterance);
       };
 
-      const countdown = async (n=3) => {
-        const el = countdownRef.current; if (!el) return;
-        for (let i=n; i>=1; i--) {
-          el.textContent = String(i);
-          el.classList.remove('hidden');
+      const countdown = async (seconds) => {
+        const el = countdownRef.current;
+        el.classList.remove('hidden');
+        for (let i = seconds; i >= 1; i--) {
+          el.textContent = i;
           await speak(String(i));
           await new Promise(r => setTimeout(r, 1000));
         }
@@ -215,7 +198,9 @@
       };
 
       const onStart = async () => {
-        await speak(settings.tts?.prompt || 'Get ready!');
+        // Use AI-generated prompt if available, otherwise use default
+        const promptToUse = aiPrompt || settings.tts?.prompt || 'Get ready!';
+        await speak(promptToUse);
         await countdown(3);
         const imgData = await capture();
         const res = await fetch('/api/upload_photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: imgData, frame })});
@@ -287,6 +272,76 @@
     };
 
     render(h(App), document.querySelector('main .grid')?.parentElement || document.body);
+  </script>
+
+  <!-- AI Prompt Functionality -->
+  <script>
+    // AI Prompt Generation
+    const generateNewPromptBtn = document.getElementById('generateNewPromptBtn');
+    const aiPromptDisplay = document.getElementById('aiPromptDisplay');
+    const aiPromptText = document.getElementById('aiPromptText');
+
+    if (generateNewPromptBtn) {
+      generateNewPromptBtn.addEventListener('click', async () => {
+        try {
+          generateNewPromptBtn.disabled = true;
+          generateNewPromptBtn.textContent = 'Generating...';
+
+          const response = await fetch('/api/ollama/generate-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context: 'photobooth' })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'success') {
+              aiPromptText.textContent = data.prompt;
+              aiPromptDisplay.classList.remove('hidden');
+              
+              // Store for TTS use
+              window.generatedPrompt = data.prompt;
+              
+              // Show success message
+              alert(`Generated prompt: "${data.prompt}"\n\nThis prompt will be used for the next photo session!`);
+            } else {
+              alert('Failed to generate prompt: ' + (data.error || 'Unknown error'));
+            }
+          } else {
+            alert('Failed to generate prompt. Please check your Ollama configuration.');
+          }
+        } catch (e) {
+          console.error('Prompt generation failed:', e);
+          alert('Failed to generate prompt: ' + e.message);
+        } finally {
+          generateNewPromptBtn.disabled = false;
+          generateNewPromptBtn.textContent = 'Generate New Prompt';
+        }
+      });
+    }
+
+    // Auto-generate a prompt when the page loads (if Ollama is enabled)
+    window.addEventListener('load', async () => {
+      try {
+        const response = await fetch('/api/ollama/generate-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ context: 'photobooth' })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success') {
+            aiPromptText.textContent = data.prompt;
+            aiPromptDisplay.classList.remove('hidden');
+            window.generatedPrompt = data.prompt;
+          }
+        }
+      } catch (e) {
+        // Silently fail - Ollama might not be configured
+        console.log('Ollama not available or not configured');
+      }
+    });
   </script>
 </body>
 </html>

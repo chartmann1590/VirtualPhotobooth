@@ -23,7 +23,8 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
         "service": os.getenv('TTS_SERVICE', 'google'),  # 'google', 'microsoft', 'elevenlabs'
         "voice": "en",  # Default voice for the selected service
         "prompt": "Get ready! The photo will start soon.",
-        "elevenlabs_api_key": os.getenv('ELEVENLABS_API_KEY', '')  # API key for ElevenLabs
+        "elevenlabs_api_key": os.getenv('ELEVENLABS_API_KEY', ''),  # API key for ElevenLabs
+        "microsoft_api_key": os.getenv('MICROSOFT_TTS_API_KEY', '')  # API key for Microsoft TTS
     }
 }
 

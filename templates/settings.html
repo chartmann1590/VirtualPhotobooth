@@ -117,6 +117,11 @@
               <input class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="password" name="elevenlabs_api_key" value="{{ settings.tts.elevenlabs_api_key }}" placeholder="Enter your ElevenLabs API key" />
               <small class="text-slate-500">Get a free API key from <a href="https://elevenlabs.io" target="_blank" class="text-indigo-400 hover:underline">elevenlabs.io</a></small>
             </label>
+            <label class="block md:col-span-2" id="microsoftApiKeyRow">
+              <span class="text-sm text-slate-400">Microsoft TTS API Key</span>
+              <input class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="password" name="microsoft_api_key" value="{{ settings.tts.microsoft_api_key }}" placeholder="Enter your Microsoft TTS API key" />
+              <small class="text-slate-500">Get a free API key from <a href="https://azure.microsoft.com/en-us/services/cognitive-services/speech-services/" target="_blank" class="text-indigo-400 hover:underline">Azure Speech Services</a></small>
+            </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-slate-400">Prompt</span>
               <input id="ttsPromptInput" class="mt-1 w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" name="tts_prompt" value="{{ settings.tts.prompt }}" />
@@ -187,6 +192,8 @@
       const serviceSelect = document.getElementById('ttsServiceSelect');
       const elevenlabsApiKeyRow = document.getElementById('elevenlabsApiKeyRow');
       const elevenlabsApiKeyInput = document.querySelector('input[name="elevenlabs_api_key"]');
+      const microsoftApiKeyRow = document.getElementById('microsoftApiKeyRow');
+      const microsoftApiKeyInput = document.querySelector('input[name="microsoft_api_key"]');
       const current = select ? select.getAttribute('data-current-voice') : '';
       const previewBtn = document.getElementById('ttsPreviewBtn');
       const previewInput = document.getElementById('ttsPreviewInput');
@@ -255,6 +262,7 @@
         
         // Show/hide service-specific elements
         elevenlabsApiKeyRow && elevenlabsApiKeyRow.classList.toggle('hidden', service !== 'elevenlabs');
+        microsoftApiKeyRow && microsoftApiKeyRow.classList.toggle('hidden', service !== 'microsoft');
         
         if (engine === 'browser') {
           if (window.speechSynthesis) {
@@ -306,6 +314,11 @@
               const audio = new Audio(`/api/tts/speak?${q.toString()}`);
               audio.play();
             } else if (service === 'microsoft') {
+              const apiKey = microsoftApiKeyInput ? microsoftApiKeyInput.value : '';
+              if (!apiKey) {
+                alert('Please enter your Microsoft TTS API key in the settings.');
+                return;
+              }
               const q = new URLSearchParams({ 
                 text, 
                 service: 'microsoft',

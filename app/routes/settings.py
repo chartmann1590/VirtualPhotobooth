@@ -53,6 +53,7 @@ def settings_page():
         data['tts']['voice'] = request.form.get('tts_voice', 'en')
         data['tts']['prompt'] = request.form.get('tts_prompt', 'Get ready! The photo will start soon.')
         data['tts']['elevenlabs_api_key'] = request.form.get('elevenlabs_api_key', '')
+        data['tts']['microsoft_api_key'] = request.form.get('microsoft_api_key', '')
         store.write(data)
 
         if 'frame' in request.files:

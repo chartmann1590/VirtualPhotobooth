@@ -24,13 +24,14 @@ TTS_SERVICES = {
         }
     },
     'microsoft': {
-        'name': 'Microsoft Edge TTS',
-        'url': 'https://edge.microsoft.com/translate/bing/tts',
-        'params': {
-            'text': '',  # text
-            'lang': 'en-US',  # language
-            'voice': 'en-US-JennyNeural'  # voice
-        }
+        'name': 'Microsoft Cognitive Services TTS',
+        'url': 'https://eastus.tts.speech.microsoft.com/cognitiveservices/v1',
+        'headers': {
+            'Ocp-Apim-Subscription-Key': '',  # Will be set from settings
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3'
+        },
+        'api_key_required': True
     },
     'elevenlabs': {
         'name': 'ElevenLabs (Free Tier)',
@@ -158,28 +159,45 @@ def _google_tts(text: str, voice: str) -> Response:
     )
 
 def _microsoft_tts(text: str, voice: str) -> Response:
-    """Generate speech using Microsoft Edge TTS"""
-    # Clean and truncate text
+    """Generate speech using Microsoft Cognitive Services TTS"""
+    # Get API key from settings
+    settings = SettingsStore(current_app.config['SETTINGS_PATH']).read()
+    api_key = settings.get('tts', {}).get('microsoft_api_key', '')
+    
+    if not api_key:
+        logger.error("Microsoft TTS API key not configured")
+        return jsonify({"error": "Microsoft TTS API key required"}), 400
+    
+    # Clean text and create SSML
     clean_text = text[:500]  # Microsoft limit
     
-    params = TTS_SERVICES['microsoft']['params'].copy()
-    params['text'] = clean_text
-    if voice:
-        params['voice'] = voice
+    # Create SSML with the selected voice
+    ssml = f"""<speak version='1.0' xml:lang='en-US'>
+        <voice xml:lang='en-US' xml:gender='neutral' name='{voice}'>
+            {clean_text}
+        </voice>
+    </speak>"""
     
     url = TTS_SERVICES['microsoft']['url']
-    response = requests.get(url, params=params, timeout=15)
+    headers = TTS_SERVICES['microsoft']['headers'].copy()
+    headers['Ocp-Apim-Subscription-Key'] = api_key
     
-    if response.status_code != 200:
-        logger.error(f"Microsoft TTS error: {response.status_code}")
+    try:
+        response = requests.post(url, data=ssml, headers=headers, timeout=15)
+        
+        if response.status_code != 200:
+            logger.error(f"Microsoft TTS error: {response.status_code} - {response.text}")
+            return jsonify({"error": "Microsoft TTS service error"}), 503
+        
+        # Microsoft returns MP3 directly
+        return Response(
+            response.content,
+            mimetype='audio/mpeg',
+            headers={'Content-Disposition': 'inline; filename=speech.mp3'}
+        )
+    except Exception as e:
+        logger.error(f"Microsoft TTS request failed: {str(e)}")
         return jsonify({"error": "Microsoft TTS service unavailable"}), 503
-    
-    # Microsoft returns MP3 directly
-    return Response(
-        response.content,
-        mimetype='audio/mpeg',
-        headers={'Content-Disposition': 'inline; filename=speech.mp3'}
-    )
 
 def _elevenlabs_tts(text: str, voice: str) -> Response:
     """Generate speech using ElevenLabs API (requires API key)"""

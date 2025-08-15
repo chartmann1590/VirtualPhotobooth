@@ -29,7 +29,7 @@ The app supports multiple free TTS engines:
 - **Languages**: 20+ languages with neural voices
 - **Quality**: Natural-sounding neural voices with male/female options
 - **Limits**: 500 characters per request
-- **Cost**: Completely free
+- **Cost**: Free tier available (requires API key)
 - **Best for**: High-quality English and European languages
 
 ### ElevenLabs (Free Tier)
@@ -59,6 +59,13 @@ No setup required - works immediately.
 2. Create a free account
 3. Get your API key from the profile section
 4. Enter the API key in Settings → TTS → ElevenLabs API Key
+
+### Microsoft TTS
+1. Visit [Azure Speech Services](https://azure.microsoft.com/en-us/services/cognitive-services/speech-services/)
+2. Create a free Azure account
+3. Create a Speech Service resource
+4. Get your API key from the resource
+5. Enter the API key in Settings → TTS → Microsoft TTS API Key
 
 ### Browser TTS
 Install additional OS voices for more natural speech:
